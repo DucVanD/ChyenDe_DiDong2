@@ -184,6 +184,13 @@ export default function Home() {
         <ProductMegaSale />
 
         {/* RECOMMEND */}
+        {/* --- ĐÃ THÊM PHẦN NÀY --- */}
+        <Section 
+            title="Recommended Product" 
+            onPress={() => router.push("/product")} 
+        />
+        {/* ----------------------- */}
+
         <View style={styles.recommendBanner}>
           <Image
             source={{

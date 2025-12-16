@@ -13,6 +13,8 @@ export default function RootLayout() {
 
       {/* Main Tabs */}
       <Stack.Screen name="(main)" />
+
+
     </Stack>
   );
 }

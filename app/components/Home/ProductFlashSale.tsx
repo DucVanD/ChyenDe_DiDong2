@@ -1,14 +1,14 @@
+import { useRouter } from "expo-router"; // <--- 1. Import
 import React from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   FlatList,
   Image,
+  StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from "react-native";
 
-/* ================== TYPE ================== */
 type ProductType = {
   id: number;
   name: string;
@@ -18,7 +18,6 @@ type ProductType = {
   image: any;
 };
 
-/* ================== DATA MOCK ================== */
 const flashSaleProducts: ProductType[] = [
   {
     id: 1,
@@ -46,34 +45,34 @@ const flashSaleProducts: ProductType[] = [
   },
 ];
 
-/* ================== ITEM ================== */
-const renderHorizontalProduct = ({ item }: { item: ProductType }) => (
-  <TouchableOpacity style={styles.card}>
-    <Image source={item.image} style={styles.image} />
-
-    <Text style={styles.name} numberOfLines={2}>
-      {item.name}
-    </Text>
-
-    <Text style={styles.price}>{item.price}</Text>
-
-    <View style={styles.row}>
-      <Text style={styles.oldPrice}>{item.oldPrice}</Text>
-      <Text style={styles.discount}>{item.discount}</Text>
-    </View>
-  </TouchableOpacity>
-);
-
-/* ================== COMPONENT ================== */
 export default function ProductFlashSale() {
+  const router = useRouter(); // <--- 2. Khởi tạo
+
+  // <--- 3. Di chuyển vào trong
+  const renderHorizontalProduct = ({ item }: { item: ProductType }) => (
+    <TouchableOpacity 
+      style={styles.card}
+        onPress={() =>
+        router.push({
+          pathname: "/product/[id]", // Đường dẫn gốc (tên file)
+          params: { id: item.id }    // Tham số truyền vào
+        })
+      }
+    >
+      <Image source={item.image} style={styles.image} />
+      <Text style={styles.name} numberOfLines={2}>
+        {item.name}
+      </Text>
+      <Text style={styles.price}>{item.price}</Text>
+      <View style={styles.row}>
+        <Text style={styles.oldPrice}>{item.oldPrice}</Text>
+        <Text style={styles.discount}>{item.discount}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <View>
-      {/* === FLASH SALE === */}
-      {/* <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Flash Sale</Text>
-        <Text style={styles.seeMoreText}>See More</Text>
-      </View> */}
-
       <FlatList
         data={flashSaleProducts}
         horizontal
@@ -87,6 +86,7 @@ export default function ProductFlashSale() {
 }
 
 const styles = StyleSheet.create({
+  // ... (Giữ nguyên styles cũ)
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -94,17 +94,14 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
   },
-
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
   },
-
   seeMoreText: {
     fontSize: 14,
     color: "#40BFFF",
   },
-
   card: {
     width: 140,
     marginRight: 16,
@@ -113,39 +110,33 @@ const styles = StyleSheet.create({
     padding: 10,
     elevation: 2,
   },
-
   image: {
     width: "100%",
     height: 120,
     resizeMode: "contain",
     marginBottom: 8,
   },
-
   name: {
     fontSize: 13,
     fontWeight: "500",
     marginBottom: 4,
   },
-
   price: {
     fontSize: 14,
     fontWeight: "bold",
     color: "#40BFFF",
   },
-
   row: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 4,
   },
-
   oldPrice: {
     fontSize: 12,
     color: "#9098B1",
     textDecorationLine: "line-through",
     marginRight: 6,
   },
-
   discount: {
     fontSize: 12,
     color: "#FB7181",

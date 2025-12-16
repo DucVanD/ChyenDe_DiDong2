@@ -1,19 +1,20 @@
+import { useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Platform,
-  StatusBar,
-  FlatList,
-  useWindowDimensions, // Dùng hook này để lấy width chuẩn nhất
-} from "react-native";
+
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import {
+    Image,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View
+} from "react-native";
 
 // Dữ liệu giả lập
 const SIZES = [6, 6.5, 7, 7.5, 8, 8.5];
@@ -31,6 +32,9 @@ const SUGGESTED_PRODUCTS = [
 ];
 
 export default function ProductDetail() {
+  const { id } = useLocalSearchParams(); 
+  
+  console.log("Product ID:", id);
   const router = useRouter();
   const { width } = useWindowDimensions(); // Lấy chiều rộng màn hình động
   const [selectedSize, setSelectedSize] = useState(6.5);

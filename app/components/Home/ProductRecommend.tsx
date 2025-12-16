@@ -1,16 +1,17 @@
+import { useRouter } from "expo-router"; // <--- 1. Import Router
 import React from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
+  Dimensions,
   FlatList,
   Image,
+  StyleSheet,
+  Text,
   TouchableOpacity,
-  Dimensions,
+  View,
 } from "react-native";
 
 const { width } = Dimensions.get("window");
-const CARD_WIDTH = (width - 48) / 2; // 2 cột + padding
+const CARD_WIDTH = (width - 48) / 2;
 
 type ProductType = {
   id: number;
@@ -56,24 +57,32 @@ const recommendProducts: ProductType[] = [
   },
 ];
 
-const renderItem = ({ item }: { item: ProductType }) => (
-  <TouchableOpacity style={styles.card}>
-    <Image source={item.image} style={styles.image} />
-
-    <Text numberOfLines={2} style={styles.name}>
-      {item.name}
-    </Text>
-
-    <Text style={styles.price}>{item.price}</Text>
-
-    <View style={styles.row}>
-      <Text style={styles.oldPrice}>{item.oldPrice}</Text>
-      <Text style={styles.discount}>{item.discount}</Text>
-    </View>
-  </TouchableOpacity>
-);
-
 export default function ProductRecommend() {
+  const router = useRouter(); // <--- 2. Khởi tạo Router
+
+  // <--- 3. Di chuyển renderItem vào bên trong để dùng được router
+  const renderItem = ({ item }: { item: ProductType }) => (
+    <TouchableOpacity 
+      style={styles.card}
+       onPress={() =>
+        router.push({
+          pathname: "/product/[id]", // Đường dẫn gốc (tên file)
+          params: { id: item.id }    // Tham số truyền vào
+        })
+      }
+    >
+      <Image source={item.image} style={styles.image} />
+      <Text numberOfLines={2} style={styles.name}>
+        {item.name}
+      </Text>
+      <Text style={styles.price}>{item.price}</Text>
+      <View style={styles.row}>
+        <Text style={styles.oldPrice}>{item.oldPrice}</Text>
+        <Text style={styles.discount}>{item.discount}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <FlatList
       data={recommendProducts}
@@ -86,13 +95,11 @@ export default function ProductRecommend() {
   );
 }
 
-
 const styles = StyleSheet.create({
   list: {
     paddingHorizontal: 16,
     paddingBottom: 20,
   },
-
   card: {
     width: CARD_WIDTH,
     backgroundColor: "#fff",
@@ -102,39 +109,33 @@ const styles = StyleSheet.create({
     marginRight: 8,
     elevation: 2,
   },
-
   image: {
     width: "100%",
     height: 140,
     resizeMode: "contain",
     marginBottom: 8,
   },
-
   name: {
     fontSize: 13,
     fontWeight: "500",
     marginBottom: 4,
   },
-
   price: {
     fontSize: 14,
     fontWeight: "bold",
     color: "#40BFFF",
   },
-
   row: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 4,
   },
-
   oldPrice: {
     fontSize: 12,
     color: "#9098B1",
     textDecorationLine: "line-through",
     marginRight: 6,
   },
-
   discount: {
     fontSize: 12,
     color: "#FB7181",
