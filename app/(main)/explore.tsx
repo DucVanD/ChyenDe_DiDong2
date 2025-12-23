@@ -10,26 +10,27 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router"; // 1. Import Router
 
 // Dữ liệu giả lập cho các danh mục
 const manFashionCategories = [
   { id: 1, label: "Man Shirt", icon: "shirt-outline" },
   { id: 2, label: "Man Work Equipment", icon: "briefcase-outline" },
-  { id: 3, label: "Man T-Shirt", icon: "shirt" }, // Sử dụng icon phù hợp hơn
+  { id: 3, label: "Man T-Shirt", icon: "shirt" }, 
   { id: 4, label: "Man Shoes", icon: "footsteps-outline" },
-  { id: 5, label: "Man Pants", icon: "list-outline" }, // Thay thế icon pants
-  { id: 6, label: "Man Underwear", icon: "medical-outline" }, // Thay thế icon underwear
+  { id: 5, label: "Man Pants", icon: "list-outline" }, 
+  { id: 6, label: "Man Underwear", icon: "medical-outline" }, 
 ];
 
 const womanFashionCategories = [
   { id: 1, label: "Dress", icon: "woman-outline" },
   { id: 2, label: "Woman T-Shirt", icon: "shirt-outline" },
-  { id: 3, label: "Woman Pants", icon: "list-outline" }, // Thay thế icon pants
-  { id: 4, label: "Skirt", icon: "ribbon-outline" }, // Thay thế icon skirt
+  { id: 3, label: "Woman Pants", icon: "list-outline" }, 
+  { id: 4, label: "Skirt", icon: "ribbon-outline" }, 
   { id: 5, label: "Woman Bag", icon: "bag-handle-outline" },
-  { id: 6, label: "High Heels", icon: "footsteps-outline" }, // Thay thế icon high heels
-  { id: 7, label: "Bikini", icon: "woman-outline" }, // Thay thế icon bikini
+  { id: 6, label: "High Heels", icon: "footsteps-outline" }, 
+  { id: 7, label: "Bikini", icon: "woman-outline" }, 
 ];
 
 // Component hiển thị một item danh mục
@@ -43,20 +44,36 @@ const CategoryItem = ({ label, icon }: { label: string; icon: any }) => (
 );
 
 export default function ExploreScreen() {
+  const router = useRouter(); // 2. Khởi tạo router
+
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.searchContainer}>
         <Ionicons name="search-outline" size={20} color="#40BFFF" style={styles.searchIcon} />
+        
+        {/* 3. Cập nhật logic tìm kiếm ở đây */}
         <TextInput
           style={styles.searchInput}
           placeholder="Search Product"
           placeholderTextColor="#9098B1"
+          returnKeyType="search" // Đổi nút Enter thành Search
+          onSubmitEditing={(event) => {
+             // Chuyển trang và truyền từ khóa
+             router.push({
+                pathname: "/searchProduct",
+                params: { q: event.nativeEvent.text }
+             });
+          }}
         />
+
       </View>
       <TouchableOpacity style={styles.iconButton}>
         <Ionicons name="heart-outline" size={24} color="#9098B1" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconButton}>
+      <TouchableOpacity 
+        style={styles.iconButton}
+        onPress={() => router.push("/notifications")} // Chuyển sang trang notification
+      >
         <Ionicons name="notifications-outline" size={24} color="#9098B1" />
         <View style={styles.badge} />
       </TouchableOpacity>

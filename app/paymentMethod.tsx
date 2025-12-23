@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import type { ComponentProps } from "react";
-// 1. Cập nhật dữ liệu: Thêm Cash on Delivery
+
+// 1. Define Types
 type PaymentMethodType = {
   id: string;
   name: string;
@@ -20,6 +20,7 @@ type PaymentMethodType = {
   iconName: string;
 };
 
+// 2. Data Source
 const paymentMethodsData: PaymentMethodType[] = [
   {
     id: '1',
@@ -40,10 +41,10 @@ const paymentMethodsData: PaymentMethodType[] = [
     iconName: 'business-outline',
   },
   {
-    id: '4', // ID mới
-    name: 'Cash on Delivery', // Tên phương thức
+    id: '4',
+    name: 'Cash on Delivery',
     iconLibrary: 'Ionicons',
-    iconName: 'cash-outline', // Icon tiền mặt
+    iconName: 'cash-outline',
   },
 ];
 
@@ -55,7 +56,7 @@ const PaymentMethod = () => {
     const isSelected = item.id === selectedMethodId;
     const IconComponent = item.iconLibrary === 'Ionicons' ? Ionicons : FontAwesome;
     
-    // Logic màu icon: Paypal màu đặc trưng, còn lại dùng màu xanh chủ đạo
+    // Logic: Paypal specific color, others use main blue
     const iconColor = item.name === 'Paypal' ? '#00457C' : '#40BFFF'; 
 
     return (
@@ -66,12 +67,19 @@ const PaymentMethod = () => {
         ]}
         onPress={() => setSelectedMethodId(item.id)}
       >
-        <IconComponent name={item.iconName} size={24} color={iconColor} style={styles.paymentIcon} />
+        {/* FIX: Added "as any" to item.iconName to solve the TS error */}
+        <IconComponent 
+            name={item.iconName as any} 
+            size={24} 
+            color={iconColor} 
+            style={styles.paymentIcon} 
+        />
+        
         <Text style={[styles.paymentName, isSelected ? styles.paymentNameActive : null]}>
           {item.name}
         </Text>
         
-        {/* Thêm dấu tích xanh nếu được chọn để UI rõ ràng hơn */}
+        {/* Blue Checkmark if selected */}
         {isSelected && (
            <Ionicons name="checkmark-circle" size={24} color="#40BFFF" style={{marginLeft: 'auto'}} />
         )}
@@ -81,6 +89,8 @@ const PaymentMethod = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -89,7 +99,7 @@ const PaymentMethod = () => {
         <Text style={styles.headerTitle}>Payment</Text>
       </View>
 
-      {/* Danh sách phương thức thanh toán */}
+      {/* List */}
       <FlatList
         data={paymentMethodsData}
         renderItem={renderItem}
@@ -97,17 +107,21 @@ const PaymentMethod = () => {
         contentContainerStyle={styles.listContainer}
       />
 
-      {/* Footer Button: Nút xác nhận để đi tiếp hoặc hoàn tất */}
+      {/* Footer Button */}
       <View style={styles.footer}>
         <TouchableOpacity 
             style={styles.confirmButton}
             onPress={() => {
-                // Xử lý logic khi bấm Confirm (ví dụ: chuyển sang trang Success hoặc Review)
-                console.log("Selected Method:", selectedMethodId);
-                // router.push("/orderSuccess"); // Ví dụ chuyển trang
+                if (selectedMethodId === '1') {
+                    // Credit Card -> go to choose card
+                    router.push("/choosePay");
+                } else {
+                    // Other methods
+                    console.log("Processing method:", selectedMethodId);
+                }
             }}
         >
-          <Text style={styles.confirmButtonText}>Confirm Payment</Text>
+            <Text style={styles.confirmButtonText}>Confirm Payment</Text>
         </TouchableOpacity>
       </View>
 
@@ -137,17 +151,17 @@ const styles = StyleSheet.create({
     color: '#223263',
   },
   listContainer: {
-    paddingBottom: 100, // Để nội dung không bị che bởi nút footer
+    paddingBottom: 100, // Space for footer
   },
   paymentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     backgroundColor: '#FFFFFF',
-    marginBottom: 2, // Tạo khoảng cách nhỏ nếu muốn
+    marginBottom: 2,
   },
   paymentItemActive: {
-    backgroundColor: '#EBF0FF', // Màu nền xanh nhạt khi được chọn
+    backgroundColor: '#EBF0FF', // Light blue bg when active
   },
   paymentIcon: {
     marginRight: 16,
@@ -160,16 +174,16 @@ const styles = StyleSheet.create({
     color: '#223263',
   },
   paymentNameActive: {
-    color: '#40BFFF', // Đổi màu chữ khi active cho đẹp hơn
+    color: '#40BFFF', // Blue text when active
   },
   
-  // Styles cho Footer Button
+  // Footer Button Styles
   footer: {
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#EBF0FF',
     backgroundColor: '#fff',
-    position: 'absolute', // Cố định ở đáy
+    position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,

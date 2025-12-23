@@ -129,7 +129,22 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.searchBox}>
           <Ionicons name="search-outline" size={20} color="#40BFFF" />
-          <TextInput placeholder="Search Product" style={styles.searchInput} />
+          {/* ============ CẬP NHẬT PHẦN NÀY ============ */}
+          <TextInput 
+            placeholder="Search Product" 
+            style={styles.searchInput}
+            returnKeyType="search" // Đổi nút Enter thành Search
+            onSubmitEditing={(event) => {
+                // Lấy từ khóa người dùng nhập
+                const query = event.nativeEvent.text;
+                // Chuyển trang và truyền params (tùy chọn)
+                router.push({
+                    pathname: "/searchProduct",
+                    params: { q: query } // Truyền từ khóa qua trang kia để lọc
+                });
+            }} 
+          />
+          {/* =========================================== */}
         </View>
 
         <Ionicons name="heart-outline" size={24} color="#9098B1" />
@@ -184,12 +199,10 @@ export default function Home() {
         <ProductMegaSale />
 
         {/* RECOMMEND */}
-        {/* --- ĐÃ THÊM PHẦN NÀY --- */}
         <Section 
             title="Recommended Product" 
             onPress={() => router.push("/product")} 
         />
-        {/* ----------------------- */}
 
         <View style={styles.recommendBanner}>
           <Image

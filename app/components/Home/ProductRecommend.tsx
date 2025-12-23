@@ -66,7 +66,7 @@ export default function ProductRecommend() {
       style={styles.card}
        onPress={() =>
         router.push({
-          pathname: "/product/[id]", // Đường dẫn gốc (tên file)
+          pathname: "/detail", // Đường dẫn gốc (tên file)
           params: { id: item.id }    // Tham số truyền vào
         })
       }
