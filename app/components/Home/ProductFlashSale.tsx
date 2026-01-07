@@ -8,73 +8,55 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import FadeInStagger from "../common/FadeInStagger";
 
-type ProductType = {
-  id: number;
-  name: string;
-  price: string;
-  oldPrice: string;
-  discount: string;
-  image: any;
-};
+import { Product } from "@/services/product.service";
 
-const flashSaleProducts: ProductType[] = [
-  {
-    id: 1,
-    name: "FS - Nike Air Max 270 React...",
-    price: "$299,43",
-    oldPrice: "$534,33",
-    discount: "24% Off",
-    image: require("../../../assets/images/nike1.png"),
-  },
-  {
-    id: 2,
-    name: "FS - QUILTED MAXI CROS...",
-    price: "$299,43",
-    oldPrice: "$534,33",
-    discount: "24% Off",
-    image: require("../../../assets/images/nike2.png"),
-  },
-  {
-    id: 3,
-    name: "FS - Nike Zoom Gravity...",
-    price: "$299,43",
-    oldPrice: "$534,33",
-    discount: "24% Off",
-    image: require("../../../assets/images/nike1.png"),
-  },
-];
+interface Props {
+  products: Product[];
+}
 
-export default function ProductFlashSale() {
-  const router = useRouter(); // <--- 2. Khởi tạo
+export default function ProductFlashSale({ products }: Props) {
+  const router = useRouter();
 
-  // <--- 3. Di chuyển vào trong
-  const renderHorizontalProduct = ({ item }: { item: ProductType }) => (
-    <TouchableOpacity 
-      style={styles.card}
+  const renderHorizontalProduct = ({ item, index }: { item: Product, index: number }) => (
+    <FadeInStagger index={index}>
+      <TouchableOpacity
+        style={styles.card}
         onPress={() =>
-        router.push({
-          pathname: "/detail", // Đường dẫn gốc (tên file)
-          params: { id: item.id }    // Tham số truyền vào
-        })
-      }
-    >
-      <Image source={item.image} style={styles.image} />
-      <Text style={styles.name} numberOfLines={2}>
-        {item.name}
-      </Text>
-      <Text style={styles.price}>{item.price}</Text>
-      <View style={styles.row}>
-        <Text style={styles.oldPrice}>{item.oldPrice}</Text>
-        <Text style={styles.discount}>{item.discount}</Text>
-      </View>
-    </TouchableOpacity>
+          router.push({
+            pathname: "/detail",
+            params: { id: item.id }
+          })
+        }
+      >
+        <Image source={{ uri: item.image }} style={styles.image} />
+        <Text style={styles.name} numberOfLines={2}>
+          {item.name}
+        </Text>
+        <Text style={styles.price}>
+          {item.discountPrice
+            ? (item.discountPrice || 0).toLocaleString('vi-VN')
+            : (item.salePrice || 0).toLocaleString('vi-VN')}đ
+        </Text>
+        <View style={styles.row}>
+          {item.discountPrice && (
+            <>
+              <Text style={styles.oldPrice}>{(item.salePrice || 0).toLocaleString('vi-VN')}đ</Text>
+              <Text style={styles.discount}>
+                {Math.round((1 - item.discountPrice / item.salePrice) * 100)}% Off
+              </Text>
+            </>
+          )}
+        </View>
+      </TouchableOpacity>
+    </FadeInStagger>
   );
 
   return (
     <View>
       <FlatList
-        data={flashSaleProducts}
+        data={products}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingLeft: 16 }}

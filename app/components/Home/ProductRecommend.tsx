@@ -9,86 +9,62 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import FadeInStagger from "../common/FadeInStagger";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48) / 2;
 
-type ProductType = {
-  id: number;
-  name: string;
-  price: string;
-  oldPrice: string;
-  discount: string;
-  image: any;
-};
+import { Product } from "@/services/product.service";
 
-const recommendProducts: ProductType[] = [
-  {
-    id: 1,
-    name: "Nike Air Max 270 React ENG",
-    price: "$299,43",
-    oldPrice: "$534,33",
-    discount: "24% Off",
-    image: require("../../../assets/images/nike1.png"),
-  },
-  {
-    id: 2,
-    name: "Nike Air Max 270 React ENG",
-    price: "$299,43",
-    oldPrice: "$534,33",
-    discount: "24% Off",
-    image: require("../../../assets/images/nike2.png"),
-  },
-  {
-    id: 3,
-    name: "Nike Air Max 270 React ENG",
-    price: "$299,43",
-    oldPrice: "$534,33",
-    discount: "24% Off",
-    image: require("../../../assets/images/nike1.png"),
-  },
-  {
-    id: 4,
-    name: "Nike Air Max 270 React ENG",
-    price: "$299,43",
-    oldPrice: "$534,33",
-    discount: "24% Off",
-    image: require("../../../assets/images/nike2.png"),
-  },
-];
+interface Props {
+  products: Product[];
+}
 
-export default function ProductRecommend() {
+export default function ProductRecommend({ products }: Props) {
   const router = useRouter(); // <--- 2. Khởi tạo Router
 
   // <--- 3. Di chuyển renderItem vào bên trong để dùng được router
-  const renderItem = ({ item }: { item: ProductType }) => (
-    <TouchableOpacity 
-      style={styles.card}
-       onPress={() =>
-        router.push({
-          pathname: "/detail", // Đường dẫn gốc (tên file)
-          params: { id: item.id }    // Tham số truyền vào
-        })
-      }
-    >
-      <Image source={item.image} style={styles.image} />
-      <Text numberOfLines={2} style={styles.name}>
-        {item.name}
-      </Text>
-      <Text style={styles.price}>{item.price}</Text>
-      <View style={styles.row}>
-        <Text style={styles.oldPrice}>{item.oldPrice}</Text>
-        <Text style={styles.discount}>{item.discount}</Text>
-      </View>
-    </TouchableOpacity>
+  const renderItem = ({ item, index }: { item: Product, index: number }) => (
+    <FadeInStagger index={index}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() =>
+          router.push({
+            pathname: "/detail", // Đường dẫn gốc (tên file)
+            params: { id: item.id }    // Tham số truyền vào
+          })
+        }
+      >
+        <Image source={{ uri: item.image }} style={styles.image} />
+        <Text numberOfLines={2} style={styles.name}>
+          {item.name}
+        </Text>
+        <Text style={styles.price}>
+          {item.discountPrice
+            ? (item.discountPrice || 0).toLocaleString('vi-VN')
+            : (item.salePrice || 0).toLocaleString('vi-VN')}đ
+        </Text>
+        <View style={styles.row}>
+          {item.discountPrice && (
+            <>
+              <Text style={styles.oldPrice}>{(item.salePrice || 0).toLocaleString('vi-VN')}đ</Text>
+              <Text style={styles.discount}>
+                {Math.round((1 - item.discountPrice / item.salePrice) * 100)}% Off
+              </Text>
+            </>
+          )}
+        </View>
+      </TouchableOpacity>
+    </FadeInStagger>
   );
 
   return (
     <FlatList
-      data={recommendProducts}
+      data={products}
       keyExtractor={(item) => item.id.toString()}
       renderItem={renderItem}
       numColumns={2}
+      scrollEnabled={false} // Vì trong Home đã có ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.list}
     />

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,27 +10,39 @@ import {
 import { Ionicons } from "@expo/vector-icons"; // Sử dụng icon set
 import { router, useNavigation } from "expo-router";
 import { useRouter } from "expo-router";
+import { getStoredUser, UserInfo } from "@/services/auth.service";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 const AddressScreen = () => {
   const navigation = useNavigation();
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [loading, setLoading] = useState(true);
   // State quản lý danh sách và ID đang được chọn
   const [selectedId, setSelectedId] = useState("1");
 
-  const addresses = [
+  // Load user data
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const storedUser = await getStoredUser();
+        setUser(storedUser);
+      } catch (error) {
+        console.error('Error loading user:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadUserData();
+  }, []);
+
+  // Prepare addresses from user data
+  const addresses = user ? [
     {
       id: "1",
-      name: "Priscekila",
-      address:
-        "3711 Spring Hill Rd undefined Tallahassee, Nevada 52874 United States",
-      phone: "+99 1234567890",
+      name: user.name || "Người dùng",
+      address: user.address || "Chưa cập nhật địa chỉ",
+      phone: user.phone || "Chưa cập nhật",
     },
-    {
-      id: "2",
-      name: "Ahmad Khaidir",
-      address:
-        "3711 Spring Hill Rd undefined Tallahassee, Nevada 52874 United States",
-      phone: "+99 1234567890",
-    },
-  ];
+  ] : [];
 
   const renderItem = ({ item }) => {
     const isSelected = item.id === selectedId;
@@ -49,7 +61,7 @@ const AddressScreen = () => {
 
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit</Text>
+            <Text style={styles.editButtonText}>Sửa</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.deleteIcon}>
             <Ionicons name="trash-outline" size={24} color="#9098B1" />
@@ -68,7 +80,7 @@ const AddressScreen = () => {
           <Ionicons name="chevron-back" size={24} color="#9098B1" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Ship To</Text>
+        <Text style={styles.headerTitle}>Giao đến</Text>
 
         {/* Nút Add New (bên phải) */}
         <TouchableOpacity>
@@ -88,10 +100,20 @@ const AddressScreen = () => {
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.nextButton}
-          // 2. Thêm sự kiện điều hướng đến trang PaymentMethod
-          onPress={() => router.push("/paymentMethod")}
+          // 2. Lưu địa chỉ đặt hàng vào AsyncStorage
+          onPress={async () => {
+            const selectedAddress = addresses.find(addr => addr.id === selectedId);
+            if (selectedAddress) {
+              await AsyncStorage.setItem('checkout_address', JSON.stringify({
+                name: selectedAddress.name,
+                address: selectedAddress.address,
+                phone: selectedAddress.phone
+              }));
+            }
+            router.push("/paymentMethod");
+          }}
         >
-          <Text style={styles.nextButtonText}>Next</Text>
+          <Text style={styles.nextButtonText}>Tiếp tục</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

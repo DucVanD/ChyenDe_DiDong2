@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Platform,
   SafeAreaView,
@@ -10,95 +11,200 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
-// Giả định đường dẫn component này đúng với project của bạn
-import ProductCart, { CartItemType } from "@/app/components/Cart/ProductCart";
+import ProductCart from "@/app/components/Cart/ProductCart";
 import { useRouter } from "expo-router";
-const initialCartItems: CartItemType[] = [
-  {
-    id: 1,
-    name: "Nike Air Zoom Pegasus 36 Miami",
-    price: 299.43,
-    image: require("../../assets/images/nike1.png"), // Thay bằng ảnh thật của bạn
-    quantity: 1,
-  },
-  {
-    id: 2,
-    name: "Nike Air Zoom Pegasus 36 Miami",
-    price: 299.43,
-    image: require("../../assets/images/nike2.png"),
-    quantity: 1,
-  },
-];
+import { getCart, getCartTotal, CartItem, clearCart } from "@/services/cart.service";
+import { showAlert, showConfirm } from "@/utils/alert";
+import LottieView from 'lottie-react-native';
+import * as Haptics from 'expo-haptics';
 
 export default function Cart() {
-  const [cartItems] = useState<CartItemType[]>(initialCartItems);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [couponCode, setCouponCode] = useState('');
   const router = useRouter();
+
+  const loadCart = async () => {
+    try {
+      setLoading(true);
+      const cart = await getCart();
+      const cartTotal = await getCartTotal();
+      setCartItems(cart);
+      setTotal(cartTotal);
+    } catch (error) {
+      console.error('Error loading cart:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-refresh cart when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCart();
+    }, [])
+  );
+
+  const handleApplyCoupon = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!couponCode.trim()) {
+      showAlert('Thông báo', 'Vui lòng nhập mã giảm giá');
+      return;
+    }
+    // TODO: Integrate with voucher API when ready
+    showAlert('Thông báo', `Mã "${couponCode}" chưa được hỗ trợ.\nTính năng đang phát triển!`);
+  };
+
+  const handleClearCart = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    showConfirm(
+      'Xác nhận',
+      'Bạn có chắc chắn muốn xóa toàn bộ giỏ hàng?',
+      async () => {
+        try {
+          await clearCart();
+          await loadCart();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showAlert('Thành công', 'Giỏ hàng đã được làm trống');
+        } catch (error) {
+          showAlert('Lỗi', 'Không thể xóa giỏ hàng');
+        }
+      }
+    );
+  };
+
+  // Optimistic update for immediate UI feedback
+  const handleCartUpdate = async () => {
+    // Reload cart and recalculate total
+    await loadCart();
+  };
+
+  // Update cart items optimistically before reload
+  const updateCartOptimistically = (updatedItems: CartItem[]) => {
+    setCartItems(updatedItems);
+    // Recalculate total immediately
+    const newTotal = updatedItems.reduce((sum, item) => {
+      const price = item.discountPrice || item.salePrice || 0;
+      return sum + (price * item.quantity);
+    }, 0);
+    setTotal(newTotal);
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color="#40BFFF" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Your Cart</Text>
+        <Text style={styles.headerTitle}>Giỏ hàng của bạn</Text>
+        {cartItems.length > 0 && (
+          <TouchableOpacity onPress={handleClearCart}>
+            <Text style={styles.clearAllText}>Xóa tất cả</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.container}>
-          {/* LIST SẢN PHẨM */}
-          <ProductCart cartItems={cartItems} />
-
-          {/* COUPON INPUT */}
-          <View style={styles.couponContainer}>
-            <TextInput
-              style={styles.couponInput}
-              placeholder="Enter Coupon Code"
-              placeholderTextColor="#9098B1"
-            />
-            <TouchableOpacity style={styles.applyButton}>
-              <Text style={styles.applyText}>Apply</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* --- PHẦN BỔ SUNG: TOTAL PRICING --- */}
-          <View style={styles.pricingContainer}>
-            {/* Items Total */}
-            <View style={styles.pricingRow}>
-              <Text style={styles.pricingLabel}>
-                Items ({cartItems.length})
-              </Text>
-              <Text style={styles.pricingValue}>$598.86</Text>
+          {cartItems.length === 0 ? (
+            // Empty Cart State
+            <View style={styles.emptyContainer}>
+              <LottieView
+                source={{ uri: 'https://assets5.lottiefiles.com/packages/lf20_qh5z2fdq.json' }} // Empty cart animation
+                autoPlay
+                loop
+                style={{ width: 200, height: 200 }}
+              />
+              <Text style={styles.emptyTitle}>Giỏ hàng trống</Text>
+              <Text style={styles.emptyText}>Hãy thêm sản phẩm vào giỏ hàng!</Text>
+              <TouchableOpacity
+                style={styles.shopNowButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push('/(main)');
+                }}
+              >
+                <Text style={styles.shopNowText}>Mua sắm ngay</Text>
+              </TouchableOpacity>
             </View>
+          ) : (
+            <>
+              {/* LIST SẢN PHẨM */}
+              <ProductCart
+                cartItems={cartItems}
+                onUpdate={handleCartUpdate}
+                onOptimisticUpdate={updateCartOptimistically}
+              />
 
-            {/* Shipping */}
-            <View style={styles.pricingRow}>
-              <Text style={styles.pricingLabel}>Shipping</Text>
-              <Text style={styles.pricingValue}>$40.00</Text>
-            </View>
+              {/* COUPON INPUT */}
+              <View style={styles.couponContainer}>
+                <TextInput
+                  style={styles.couponInput}
+                  placeholder="Nhập mã giảm giá"
+                  placeholderTextColor="#9098B1"
+                  value={couponCode}
+                  onChangeText={setCouponCode}
+                />
+                <TouchableOpacity
+                  style={styles.applyButton}
+                  onPress={handleApplyCoupon}
+                >
+                  <Text style={styles.applyText}>Áp dụng</Text>
+                </TouchableOpacity>
+              </View>
 
-            {/* Import Charges */}
-            <View style={styles.pricingRow}>
-              <Text style={styles.pricingLabel}>Import charges</Text>
-              <Text style={styles.pricingValue}>$128.00</Text>
-            </View>
+              {/* --- PHẦN BỔ SUNG: TOTAL PRICING --- */}
+              <View style={styles.pricingContainer}>
+                {/* Items Total */}
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingLabel}>
+                    Sản phẩm ({cartItems.length})
+                  </Text>
+                  <Text style={styles.pricingValue}>{(total || 0).toLocaleString('vi-VN')}đ</Text>
+                </View>
 
-            {/* Separator Line (Nét đứt) */}
-            <View style={styles.separator} />
+                {/* Shipping */}
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingLabel}>Vận chuyển</Text>
+                  <Text style={styles.pricingValue}>0đ</Text>
+                </View>
 
-            {/* Total Price */}
-            <View style={styles.pricingRow}>
-              <Text style={styles.totalLabel}>Total Price</Text>
-              <Text style={styles.totalValue}>$766.86</Text>
-            </View>
-          </View>
-          {/* CHECKOUT BUTTON */}
-          <TouchableOpacity
-            style={styles.checkoutButton}
-            // 3. THÊM SỰ KIỆN NÀY:
-            // Lưu ý: Đường dẫn bên trong push phải khớp với tên file của bạn trong thư mục app
-            // Ví dụ: nếu file Address là app/addressShip.js thì điền "/addressShip"
-            onPress={() => router.push("/addressShip")}
-          >
-            <Text style={styles.checkoutText}>Check Out</Text>
-          </TouchableOpacity>
+                {/* Separator Line (Nét đứt) */}
+                <View style={styles.separator} />
+
+                {/* Total Price */}
+                <View style={styles.pricingRow}>
+                  <Text style={styles.totalLabel}>Tổng cộng</Text>
+                  <Text style={styles.totalValue}>{(total || 0).toLocaleString('vi-VN')}đ</Text>
+                </View>
+              </View>
+              {/* CHECKOUT BUTTON */}
+              <TouchableOpacity
+                style={styles.checkoutButton}
+                onPress={() => {
+                  if (cartItems.length === 0) {
+                    showAlert('Thông báo', 'Giỏ hàng trống');
+                    return;
+                  }
+                  // Navigate to address screen
+                  router.push("/addressShip");
+                }}
+              >
+                <Text style={styles.checkoutText}>Thanh toán</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -115,11 +221,19 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#EBF0FF",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: "700",
     color: "#223263",
+  },
+  clearAllText: {
+    fontSize: 14,
+    color: '#FB7181', // Màu đỏ nhẹ cho nút xóa
+    fontWeight: '600',
   },
   container: {
     paddingHorizontal: 16,
@@ -197,6 +311,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#40BFFF", // Màu xanh dương cho tổng tiền
+  },
+
+  // Empty Cart Styles
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#223263',
+    marginTop: 24,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9098B1',
+    marginTop: 12,
+    marginBottom: 32,
+  },
+  shopNowButton: {
+    backgroundColor: '#40BFFF',
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 5,
+  },
+  shopNowText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
 
   // Checkout Button

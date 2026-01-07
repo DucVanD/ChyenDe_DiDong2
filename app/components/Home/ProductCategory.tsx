@@ -1,42 +1,51 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import FadeInStagger from "../common/FadeInStagger";
 
-type Category = {
-  id: number;
-  name: string;
-  icon: keyof typeof Ionicons.glyphMap;
-};
+import { Category } from "@/services/category.service";
 
-  const categories: Category[] = [
-    { id: 1, name: "Man Shirt", icon: "shirt-outline" },
-    { id: 2, name: "Dress", icon: "woman-outline" },
-    { id: 3, name: "Man Work", icon: "briefcase-outline" },
-    { id: 4, name: "Woman Bag", icon: "bag-handle-outline" },
-    { id: 5, name: "Shoes", icon: "footsteps-outline" },
-  ];
-export default function ProductCategory() {
+interface Props {
+  categories: Category[];
+}
+
+export default function ProductCategory({ categories }: Props) {
+  const router = useRouter();
+
   return (
     <View style={styles.container}>
-
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.categoryScroll}
       >
-        {categories.map((cat) => (
-          <TouchableOpacity key={cat.id} style={styles.categoryItem}>
-            <View style={styles.categoryIconCircle}>
-              <Ionicons name={cat.icon} size={24} color="#40BFFF" />
-            </View>
-            <Text style={styles.categoryText}>{cat.name}</Text>
-          </TouchableOpacity>
+        {categories.map((cat, index) => (
+          <FadeInStagger key={cat.id} index={index}>
+            <TouchableOpacity
+              style={styles.categoryItem}
+              onPress={() => router.push({
+                pathname: "/searchProduct",
+                params: { categoryId: cat.id }
+              })}
+            >
+              <View style={styles.categoryIconCircle}>
+                {cat.image ? (
+                  <Image source={{ uri: cat.image }} style={{ width: 30, height: 30 }} />
+                ) : (
+                  <Ionicons name="apps-outline" size={24} color="#40BFFF" />
+                )}
+              </View>
+              <Text style={styles.categoryText} numberOfLines={1}>{cat.name}</Text>
+            </TouchableOpacity>
+          </FadeInStagger>
         ))}
       </ScrollView>
     </View>

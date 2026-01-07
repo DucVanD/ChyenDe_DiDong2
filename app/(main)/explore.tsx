@@ -1,4 +1,5 @@
-import React from "react";
+import { getCategories, Category } from "@/services/category.service";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,70 +10,78 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router"; // 1. Import Router
-
-// Dữ liệu giả lập cho các danh mục
-const manFashionCategories = [
-  { id: 1, label: "Man Shirt", icon: "shirt-outline" },
-  { id: 2, label: "Man Work Equipment", icon: "briefcase-outline" },
-  { id: 3, label: "Man T-Shirt", icon: "shirt" }, 
-  { id: 4, label: "Man Shoes", icon: "footsteps-outline" },
-  { id: 5, label: "Man Pants", icon: "list-outline" }, 
-  { id: 6, label: "Man Underwear", icon: "medical-outline" }, 
-];
-
-const womanFashionCategories = [
-  { id: 1, label: "Dress", icon: "woman-outline" },
-  { id: 2, label: "Woman T-Shirt", icon: "shirt-outline" },
-  { id: 3, label: "Woman Pants", icon: "list-outline" }, 
-  { id: 4, label: "Skirt", icon: "ribbon-outline" }, 
-  { id: 5, label: "Woman Bag", icon: "bag-handle-outline" },
-  { id: 6, label: "High Heels", icon: "footsteps-outline" }, 
-  { id: 7, label: "Bikini", icon: "woman-outline" }, 
-];
+import { useRouter } from "expo-router";
 
 // Component hiển thị một item danh mục
-const CategoryItem = ({ label, icon }: { label: string; icon: any }) => (
-  <TouchableOpacity style={styles.categoryItem}>
-    <View style={styles.categoryIconCircle}>
-      <Ionicons name={icon} size={24} color="#40BFFF" />
-    </View>
-    <Text style={styles.categoryLabel}>{label}</Text>
-  </TouchableOpacity>
-);
+const CategoryItem = ({ item }: { item: Category }) => {
+  const router = useRouter();
+
+  return (
+    <TouchableOpacity
+      style={styles.categoryItem}
+      onPress={() => router.push({
+        pathname: "/searchProduct",
+        params: { categoryId: item.id }
+      })}
+    >
+      <View style={styles.categoryIconCircle}>
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={{ width: 40, height: 40 }} />
+        ) : (
+          <Ionicons name="apps-outline" size={24} color="#40BFFF" />
+        )}
+      </View>
+      <Text style={styles.categoryLabel}>{item.name}</Text>
+    </TouchableOpacity>
+  );
+};
 
 export default function ExploreScreen() {
-  const router = useRouter(); // 2. Khởi tạo router
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const cats = await getCategories();
+        setCategories(cats);
+      } catch (error) {
+        console.error("Lỗi khi tải danh mục:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.searchContainer}>
         <Ionicons name="search-outline" size={20} color="#40BFFF" style={styles.searchIcon} />
-        
-        {/* 3. Cập nhật logic tìm kiếm ở đây */}
         <TextInput
           style={styles.searchInput}
-          placeholder="Search Product"
+          placeholder="Tìm kiếm sản phẩm"
           placeholderTextColor="#9098B1"
-          returnKeyType="search" // Đổi nút Enter thành Search
+          returnKeyType="search"
           onSubmitEditing={(event) => {
-             // Chuyển trang và truyền từ khóa
-             router.push({
-                pathname: "/searchProduct",
-                params: { q: event.nativeEvent.text }
-             });
+            router.push({
+              pathname: "/searchProduct",
+              params: { q: event.nativeEvent.text }
+            });
           }}
         />
-
       </View>
       <TouchableOpacity style={styles.iconButton}>
         <Ionicons name="heart-outline" size={24} color="#9098B1" />
       </TouchableOpacity>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.iconButton}
-        onPress={() => router.push("/notifications")} // Chuyển sang trang notification
+        onPress={() => router.push("/notifications")}
       >
         <Ionicons name="notifications-outline" size={24} color="#9098B1" />
         <View style={styles.badge} />
@@ -80,29 +89,41 @@ export default function ExploreScreen() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#40BFFF" />
+          <Text style={{ marginTop: 10, color: '#9098B1' }}>Đang tải danh mục...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Group children by parent
+  const parentCategories = categories.filter(cat => !cat.parentId);
+  const childCategories = categories.filter(cat => cat.parentId);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {renderHeader()}
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Man Fashion Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Man Fashion</Text>
-          <View style={styles.categoriesGrid}>
-            {manFashionCategories.map((item) => (
-              <CategoryItem key={item.id} label={item.label} icon={item.icon} />
-            ))}
-          </View>
-        </View>
+        {parentCategories.map(parent => {
+          const children = childCategories.filter(child => child.parentId === parent.id);
 
-        {/* Woman Fashion Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Woman Fashion</Text>
-          <View style={styles.categoriesGrid}>
-            {womanFashionCategories.map((item) => (
-              <CategoryItem key={item.id} label={item.label} icon={item.icon} />
-            ))}
-          </View>
-        </View>
+          if (children.length === 0) return null;
+
+          return (
+            <View key={parent.id} style={styles.section}>
+              <Text style={styles.sectionTitle}>{parent.name}</Text>
+              <View style={styles.categoriesGrid}>
+                {children.map((item) => (
+                  <CategoryItem key={item.id} item={item} />
+                ))}
+              </View>
+            </View>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );

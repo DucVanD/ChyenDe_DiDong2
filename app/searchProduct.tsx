@@ -1,57 +1,26 @@
-import React, { useState } from "react";
+import { filterProducts, Product, searchProducts } from "@/services/product.service";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
+  ActivityIndicator,
   FlatList,
   Image,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
-  StatusBar,
   Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import LottieView from 'lottie-react-native';
+import * as Haptics from 'expo-haptics';
+import Skeleton from "@/app/components/common/Skeleton";
+import FadeInStagger from "@/app/components/common/FadeInStagger";
 
-// 1. ĐỊNH NGHĨA KIỂU DỮ LIỆU (Fix lỗi "implicitly has an 'any' type")
-interface ProductType {
-  id: string;
-  title: string;
-  price: number;
-  oldPrice: number;
-  discount: string;
-  rating: number;
-  reviews: number;
-  image: string;
-}
-
-// Dữ liệu giả lập
-const productsData: ProductType[] = [
-  {
-    id: "1",
-    title: "Nike Air Max 270 React ENG",
-    price: 299.43,
-    oldPrice: 534.33,
-    discount: "24% Off",
-    rating: 4,
-    reviews: 12,
-    image: "https://static.nike.com/a/images/c_limit,w_592,f_auto/t_product_v1/e6da41fa-1be4-4ce5-b89c-22be4f1f02d4/air-force-1-07-shoes-WrLlWX.png",
-  },
-  {
-    id: "2",
-    title: "Nike Air Zoom Pegasus 36",
-    price: 299.43,
-    oldPrice: 534.33,
-    discount: "24% Off",
-    rating: 5,
-    reviews: 10,
-    image: "https://static.nike.com/a/images/c_limit,w_592,f_auto/t_product_v1/5256e632-6e23-4560-b6dc-42c2323e6559/air-jordan-1-low-se-shoes-H7DD5v.png",
-  },
-  // Thêm dữ liệu khác...
-];
-
-// Component hiển thị sao (Fix lỗi rating: any)
+// Component hiển thị sao
 const StarRating = ({ rating }: { rating: number }) => {
   const stars = [];
   for (let i = 1; i <= 5; i++) {
@@ -60,7 +29,7 @@ const StarRating = ({ rating }: { rating: number }) => {
         key={i}
         name={i <= rating ? "star" : "star-outline"}
         size={12}
-        color="#FFC107" // Màu vàng
+        color="#FFC107"
       />
     );
   }
@@ -69,78 +38,189 @@ const StarRating = ({ rating }: { rating: number }) => {
 
 export default function SearchProduct() {
   const router = useRouter();
-  const params = useLocalSearchParams(); // Lấy từ khóa tìm kiếm từ trang Home gửi qua
-  const [searchQuery, setSearchQuery] = useState(params.q?.toString() || "");
+  const params = useLocalSearchParams();
 
-  // Render từng item (Fix lỗi item: any)
-  const renderItem = ({ item }: { item: ProductType }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() =>
-        // LOGIC CHUYỂN TRANG BẠN YÊU CẦU
-        router.push({
-          pathname: "/detail", // Chuyển sang file detail.tsx
-          params: { id: item.id }    // Gửi kèm ID sản phẩm
-        })
+  const initialQuery = params.q?.toString() || "";
+  const categoryId = params.categoryId ? Number(params.categoryId) : null;
+
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+
+  const fetchProducts = useCallback(async (pageNum: number, isNewSearch = false) => {
+    try {
+      if (isNewSearch) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
       }
-    >
-      <Image source={{ uri: item.image }} style={styles.image} resizeMode="contain" />
-      <View style={styles.details}>
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
-        
-        {/* Rating Section */}
-        <View style={styles.ratingContainer}>
-            <StarRating rating={item.rating} />
-        </View>
 
-        <Text style={styles.price}>${item.price}</Text>
-        
-        <View style={styles.oldPriceContainer}>
-          <Text style={styles.oldPrice}>${item.oldPrice}</Text>
-          <Text style={styles.discount}>{item.discount}</Text>
+      let response;
+      if (categoryId) {
+        // Nếu có categoryId, ưu tiên lọc theo category
+        response = await filterProducts({
+          categoryId: [categoryId],
+          page: pageNum,
+          size: 10
+        });
+      } else if (searchQuery) {
+        // Nếu có query, tìm kiếm
+        response = await searchProducts(searchQuery, pageNum, 10);
+      } else {
+        // Mặc định lấy tất cả hoặc lọc trống
+        response = await filterProducts({
+          page: pageNum,
+          size: 10
+        });
+      }
+
+      if (isNewSearch) {
+        setProducts(response.content);
+      } else {
+        setProducts(prev => [...prev, ...response.content]);
+      }
+
+      setTotalPages(response.totalPages);
+      setTotalElements(response.totalElements);
+    } catch (error) {
+      console.error("Lỗi khi tải sản phẩm:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [searchQuery, categoryId]);
+
+  useEffect(() => {
+    setPage(0);
+    fetchProducts(0, true);
+  }, [initialQuery, categoryId]);
+
+  const handleSearch = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setPage(0);
+    fetchProducts(0, true);
+  };
+
+  const loadMore = () => {
+    if (!loadingMore && page < totalPages - 1) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchProducts(nextPage);
+    }
+  };
+
+  const renderItem = ({ item, index }: { item: Product, index: number }) => (
+    <FadeInStagger index={index % 10} style={{ width: '48%' }}>
+      <TouchableOpacity
+        style={[styles.card, { width: '100%' }]}
+        onPress={() =>
+          router.push({
+            pathname: "/detail",
+            params: { id: item.id }
+          })
+        }
+      >
+        <Image source={{ uri: item.image }} style={styles.image} resizeMode="contain" />
+        <View style={styles.details}>
+          <Text style={styles.title} numberOfLines={2}>
+            {item.name}
+          </Text>
+
+          <View style={styles.ratingContainer}>
+            <StarRating rating={4} />
+          </View>
+
+          <Text style={styles.price}>
+            {item.discountPrice
+              ? (item.discountPrice || 0).toLocaleString('vi-VN')
+              : (item.salePrice || 0).toLocaleString('vi-VN')}đ
+          </Text>
+
+          {item.discountPrice && (
+            <View style={styles.oldPriceContainer}>
+              <Text style={styles.oldPrice}>{(item.salePrice || 0).toLocaleString('vi-VN')}đ</Text>
+              <Text style={styles.discount}>
+                {Math.round((1 - item.discountPrice / item.salePrice) * 100)}% Off
+              </Text>
+            </View>
+          )}
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </FadeInStagger>
   );
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header Search */}
       <View style={styles.header}>
         <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={20} color="#40BFFF" />
-            <TextInput 
-                style={styles.searchInput}
-                placeholder="Search Product"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-            />
+          <Ionicons name="search-outline" size={20} color="#40BFFF" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm sản phẩm"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+          />
         </View>
-        <TouchableOpacity style={styles.iconButton}>
-             <Ionicons name="filter-outline" size={24} color="#9098B1" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton}>
-             <Ionicons name="funnel-outline" size={24} color="#9098B1" />
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+        >
+          <Ionicons name="filter-outline" size={24} color="#9098B1" />
         </TouchableOpacity>
       </View>
 
       <View style={styles.resultInfo}>
-          <Text style={styles.resultText}>{productsData.length} Result</Text>
-          <Text style={styles.resultText}>Man Shoes</Text> 
+        <Text style={styles.resultText}>{totalElements} Kết quả</Text>
+        {categoryId && <Text style={styles.resultText}>Danh mục: {params.categoryName || categoryId}</Text>}
       </View>
 
-      {/* List Products */}
-      <FlatList
-        data={productsData}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2} // Hiển thị 2 cột
-        columnWrapperStyle={styles.row} // Style cho hàng
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.listContent}>
+          <View style={styles.row}>
+            {[1, 2, 3, 4].map(i => (
+              <View key={i} style={[styles.card, { width: '48%' }]}>
+                <Skeleton width="100%" height={100} borderRadius={5} />
+                <Skeleton width="100%" height={15} style={{ marginTop: 12 }} />
+                <Skeleton width="60%" height={15} style={{ marginTop: 8 }} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : (
+        <FlatList
+          data={products}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color="#40BFFF" style={{ margin: 16 }} /> : null}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', marginTop: 50, paddingHorizontal: 40 }}>
+              <LottieView
+                source={{ uri: 'https://assets3.lottiefiles.com/packages/lf20_ghp9v0v0.json' }} // No results
+                autoPlay
+                loop
+                style={{ width: 200, height: 200 }}
+              />
+              <Text style={{ color: '#223263', fontWeight: '700', fontSize: 16, marginTop: 16 }}>
+                Không tìm thấy kết quả
+              </Text>
+              <Text style={{ color: '#9098B1', textAlign: 'center', marginTop: 8 }}>
+                Vui lòng thử tìm kiếm với từ khóa khác
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -186,7 +266,7 @@ const styles = StyleSheet.create({
     color: '#9098B1',
     fontWeight: '700',
   },
-  
+
   // List Styles
   listContent: {
     paddingHorizontal: 16,

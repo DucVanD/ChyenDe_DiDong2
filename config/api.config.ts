@@ -1,0 +1,57 @@
+/**
+ * ========================================
+ * CẤU HÌNH API CHO ỨNG DỤNG
+ * ========================================
+ * Thay đổi BASE_URL khi deploy lên server thực
+ */
+
+import { Platform } from "react-native";
+
+// Tự động chọn URL phù hợp với platform
+// Web: dùng localhost
+// Mobile: dùng IP máy chạy backend (thay đổi IP này nếu cần)
+const IP_ADDRESS = "10.223.114.230"; // IP backend ADMIN_DiDong/demo
+const PORT = "8080";
+
+export const API_BASE_URL =
+    Platform.OS === "web"
+        ? `http://localhost:${PORT}/api`      // 🌐 WEB
+        : `http://${IP_ADDRESS}:${PORT}/api`; // 📱 MOBILE
+
+// ========================================
+// ENDPOINTS
+// ========================================
+export const ENDPOINTS = {
+    // Auth
+    register: `${API_BASE_URL}/auth/register`,
+    login: `${API_BASE_URL}/auth/login`,
+    me: `${API_BASE_URL}/auth/me`,
+
+    // Products
+    products: `${API_BASE_URL}/products`,
+
+    // Categories
+    categories: `${API_BASE_URL}/categories`,
+
+    // Cart
+    cart: `${API_BASE_URL}/cart`,
+
+    // Orders
+    orders: `${API_BASE_URL}/orders`,
+
+    // Vouchers
+    vouchers: `${API_BASE_URL}/vouchers`,
+
+    // Users
+    users: `${API_BASE_URL}/users`,
+};
+
+// ========================================
+// ASYNC STORAGE KEYS
+// ========================================
+export const STORAGE_KEYS = {
+    TOKEN: "auth_token",
+    USER: "user_info",
+    SAVED_EMAIL: "saved_email",        // For "Remember Me" feature
+    REMEMBER_ME: "remember_me",        // Boolean flag
+};

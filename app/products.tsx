@@ -111,7 +111,7 @@ const CARD_WIDTH = width / 2 - 24;
 export default function ProductList() {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
-  
+
   // State quản lý hiển thị Modal Filter
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -125,7 +125,11 @@ export default function ProductList() {
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.8}
-      onPress={() => router.push(`/product/[id]`)}
+      // ...existing code...
+      onPress={() =>
+        router.push({ pathname: "/detail", params: { id: item.id.toString() } })
+      }
+    // ...existing code...
     >
       <View style={styles.imageContainer}>
         <Image source={{ uri: item.image }} style={styles.cardImage} />
@@ -138,12 +142,12 @@ export default function ProductList() {
 
         <View style={styles.ratingContainer}>
           {[1, 2, 3, 4, 5].map((star) => (
-             <Ionicons 
-                key={star} 
-                name={star <= Math.round(item.rating) ? "star" : "star-outline"} 
-                size={12} 
-                color="#FFC107" 
-             />
+            <Ionicons
+              key={star}
+              name={star <= Math.round(item.rating) ? "star" : "star-outline"}
+              size={12}
+              color="#FFC107"
+            />
           ))}
         </View>
 
@@ -154,7 +158,7 @@ export default function ProductList() {
           )}
         </View>
         <View style={styles.reviewsWrapper}>
-             <Text style={styles.reviewText}>{item.reviews} Reviews</Text>
+          <Text style={styles.reviewText}>{item.reviews} Reviews</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -184,14 +188,14 @@ export default function ProductList() {
           />
         </View>
         {/* Nút mở Filter Modal */}
-        <TouchableOpacity 
-            style={styles.iconButton} 
-            onPress={() => setModalVisible(true)}
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => setModalVisible(true)}
         >
-             <Ionicons name="filter-outline" size={24} color="#40BFFF" />
+          <Ionicons name="filter-outline" size={24} color="#40BFFF" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconButton}>
-             <Ionicons name="funnel-outline" size={24} color="#9098B1" />
+          <Ionicons name="funnel-outline" size={24} color="#9098B1" />
         </TouchableOpacity>
       </View>
 
@@ -211,10 +215,10 @@ export default function ProductList() {
         columnWrapperStyle={styles.columnWrapper}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-                <Ionicons name="search" size={50} color="#EBF0FF"/>
-                <Text style={styles.emptyText}>Product Not Found</Text>
-            </View>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search" size={50} color="#EBF0FF" />
+            <Text style={styles.emptyText}>Product Not Found</Text>
+          </View>
         }
       />
 
@@ -227,7 +231,7 @@ export default function ProductList() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            
+
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter Search</Text>
@@ -237,12 +241,12 @@ export default function ProductList() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              
+
               {/* Filter: Price Range */}
               <Text style={styles.filterSectionTitle}>Price Range</Text>
               <View style={styles.priceInputs}>
                 <TextInput style={styles.priceInput} placeholder="$1.00" placeholderTextColor="#9098B1" keyboardType="numeric" />
-                <Text style={{color: '#9098B1'}}> - </Text>
+                <Text style={{ color: '#9098B1' }}> - </Text>
                 <TextInput style={styles.priceInput} placeholder="$1000" placeholderTextColor="#9098B1" keyboardType="numeric" />
               </View>
 
@@ -250,9 +254,9 @@ export default function ProductList() {
               <Text style={styles.filterSectionTitle}>Condition</Text>
               <View style={styles.chipContainer}>
                 {['New', 'Used', 'Not Specified'].map((chip, index) => (
-                    <TouchableOpacity key={index} style={[styles.chip, index === 0 && styles.chipActive]}>
-                        <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{chip}</Text>
-                    </TouchableOpacity>
+                  <TouchableOpacity key={index} style={[styles.chip, index === 0 && styles.chipActive]}>
+                    <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{chip}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
 
@@ -260,19 +264,19 @@ export default function ProductList() {
               <Text style={styles.filterSectionTitle}>Buying Format</Text>
               <View style={styles.chipContainer}>
                 {['All Listings', 'Accept Offers', 'Auction', 'Buy It Now'].map((chip, index) => (
-                    <TouchableOpacity key={index} style={[styles.chip, index === 3 && styles.chipActive]}>
-                        <Text style={[styles.chipText, index === 3 && styles.chipTextActive]}>{chip}</Text>
-                    </TouchableOpacity>
+                  <TouchableOpacity key={index} style={[styles.chip, index === 3 && styles.chipActive]}>
+                    <Text style={[styles.chipText, index === 3 && styles.chipTextActive]}>{chip}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
 
               {/* Filter: Item Location */}
               <Text style={styles.filterSectionTitle}>Item Location</Text>
               <View style={styles.chipContainer}>
-                  {['US Only', 'North America', 'Europe', 'Asia'].map((chip, index) => (
-                    <TouchableOpacity key={index} style={[styles.chip, index === 0 && styles.chipActive]}>
-                        <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{chip}</Text>
-                    </TouchableOpacity>
+                {['US Only', 'North America', 'Europe', 'Asia'].map((chip, index) => (
+                  <TouchableOpacity key={index} style={[styles.chip, index === 0 && styles.chipActive]}>
+                    <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{chip}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
 
@@ -280,12 +284,12 @@ export default function ProductList() {
 
             {/* Modal Footer */}
             <View style={styles.modalFooter}>
-                <TouchableOpacity 
-                    style={styles.applyButton}
-                    onPress={() => setModalVisible(false)}
-                >
-                    <Text style={styles.applyButtonText}>Apply Filter</Text>
-                </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.applyButtonText}>Apply Filter</Text>
+              </TouchableOpacity>
             </View>
 
           </View>

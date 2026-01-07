@@ -1,22 +1,48 @@
-import { Image, StyleSheet, View, TouchableOpacity } from "react-native";
+import { Image, StyleSheet, View, ActivityIndicator, Text } from "react-native";
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
+import { getToken } from "@/services/auth.service";
 
 export default function Splash() {
   const router = useRouter();
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Wait for 1.5 seconds to show splash screen
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Check if user has valid token
+        const token = await getToken();
+
+        if (token) {
+          // User is logged in, go to main app
+          router.replace("/(main)");
+        } else {
+          // No token, go to login
+          router.replace("/login");
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error);
+        // On error, go to login
+        router.replace("/login");
+      }
+    };
+
+    checkAuth();
+  }, []);
+
   return (
-    <TouchableOpacity
-      style={styles.container}
-      activeOpacity={0.9}
-      onPress={() => router.replace("/login")}
-    >
+    <View style={styles.container}>
       <View style={styles.logoContainer}>
         <Image
           source={require("../assets/images/logo.png")}
           style={styles.logo}
         />
       </View>
-    </TouchableOpacity>
+      <ActivityIndicator size="large" color="#fff" style={{ marginTop: 20 }} />
+      <Text style={styles.loadingText}>Đang kiểm tra...</Text>
+    </View>
   );
 }
 
@@ -56,5 +82,11 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: "#EAF6FF",
+  },
+
+  loadingText: {
+    color: "#fff",
+    marginTop: 10,
+    fontSize: 14,
   },
 });

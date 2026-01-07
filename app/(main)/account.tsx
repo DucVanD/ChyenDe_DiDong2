@@ -2,6 +2,8 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, Platform, StatusBar } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as Haptics from 'expo-haptics';
+import FadeInStagger from "@/app/components/common/FadeInStagger";
 
 export default function Profile() {
   const router = useRouter();
@@ -19,7 +21,10 @@ export default function Profile() {
 
     return (
       <Pressable
-        onPress={onPress}
+        onPress={() => {
+          Haptics.selectionAsync();
+          onPress();
+        }}
         style={({ pressed }) => [
           styles.menuItem,
           { backgroundColor: pressed ? "#EBF0FF" : "#fff" }
@@ -36,50 +41,59 @@ export default function Profile() {
     <SafeAreaView style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Account</Text>
+        <Text style={styles.headerTitle}>Tài khoản</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        
+
         {/* 1. PROFILE */}
-        <MenuItem 
-          iconName="person-outline" 
-          label="Profile" 
-          // Thêm "as any" vào đường dẫn
-          onPress={() => router.push("/profile" as any)} 
-        />
+        <FadeInStagger index={0}>
+          <MenuItem
+            iconName="person-outline"
+            label="Hồ sơ"
+            onPress={() => router.push("/profile" as any)}
+          />
+        </FadeInStagger>
 
         {/* 2. ORDER */}
-        <MenuItem 
-          iconName="bag-handle-outline" 
-          label="Order" 
-          onPress={() => router.push("/orders" as any)} 
-        />
+        <FadeInStagger index={1}>
+          <MenuItem
+            iconName="bag-handle-outline"
+            label="Đơn hàng"
+            onPress={() => router.push("/orders" as any)}
+          />
+        </FadeInStagger>
 
         {/* 3. ADDRESS */}
-        <MenuItem 
-          iconName="location-outline" 
-          label="Address" 
-          onPress={() => router.push("/address" as any)} 
-        />
+        <FadeInStagger index={2}>
+          <MenuItem
+            iconName="location-outline"
+            label="Địa chỉ"
+            onPress={() => router.push("/address" as any)}
+          />
+        </FadeInStagger>
 
         {/* 4. PAYMENT */}
-        <MenuItem 
-          iconName="card-outline" 
-          label="Payment" 
-          onPress={() => router.push("/payment" as any)} 
-        />
+        <FadeInStagger index={3}>
+          <MenuItem
+            iconName="card-outline"
+            label="Thanh toán"
+            onPress={() => router.push("/payment" as any)}
+          />
+        </FadeInStagger>
 
         {/* ĐƯỜNG KẺ NGĂN CÁCH */}
         <View style={styles.separator} />
 
         {/* 5. LOG OUT */}
-        <MenuItem 
-          iconName="log-out-outline" 
-          label="Log Out" 
-          onPress={handleLogout} 
-          isLogout={true}
-        />
+        <FadeInStagger index={4}>
+          <MenuItem
+            iconName="log-out-outline"
+            label="Đăng xuất"
+            onPress={handleLogout}
+            isLogout={true}
+          />
+        </FadeInStagger>
 
       </ScrollView>
     </SafeAreaView>
@@ -92,7 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
-  
+
   // Header
   header: {
     paddingHorizontal: 16,
@@ -109,7 +123,7 @@ const styles = StyleSheet.create({
 
   // Content
   content: {
-    paddingTop: 0, 
+    paddingTop: 0,
   },
 
   // Menu Item
@@ -130,7 +144,7 @@ const styles = StyleSheet.create({
   // Separator
   separator: {
     height: 1,
-    backgroundColor: "#EBF0FF", 
+    backgroundColor: "#EBF0FF",
     marginVertical: 10,
     marginHorizontal: 16,
   }

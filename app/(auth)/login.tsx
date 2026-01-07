@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
-import { useState } from "react"; // 1. Import useState
+import { useState, useEffect } from "react";
 import {
   Alert,
   Image,
@@ -9,28 +9,85 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { login } from "../../services/auth.service";
+import { syncCartAfterLogin } from "../../services/cart.service";
+import { STORAGE_KEYS } from "../../config/api.config";
 
 export default function Login() {
   const router = useRouter();
-  
-  // 2. Tạo state để lưu dữ liệu nhập vào (giúp ô input gõ được chữ)
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
-  // 3. Hàm xử lý đăng nhập Demo
-  const handleSignIn = () => {
-    // Logic giả: Chỉ cần người dùng không để trống là cho qua
+  // Load saved email on mount
+  useEffect(() => {
+    const loadSavedEmail = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_EMAIL);
+        const rememberFlag = await AsyncStorage.getItem(STORAGE_KEYS.REMEMBER_ME);
+
+        if (savedEmail && rememberFlag === "true") {
+          setEmail(savedEmail);
+          setRememberMe(true);
+        }
+      } catch (error) {
+        console.error("Error loading saved email:", error);
+      }
+    };
+    loadSavedEmail();
+  }, []);
+
+  const handleSignIn = async () => {
+    // Validation
     if (email.trim() === "" || password.trim() === "") {
-      Alert.alert("Thông báo", "Vui lòng nhập Email và Mật khẩu để demo!");
+      const msg = "Vui lòng nhập đầy đủ Email và Mật khẩu!";
+      console.error("❌", msg);
+      Alert.alert("Lỗi", msg);
       return;
     }
 
-    // Có thể hardcode thử một tài khoản admin nếu muốn
-    // if (email !== "admin" || password !== "123") { ... }
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      const msg = "Vui lòng nhập địa chỉ email hợp lệ!";
+      console.error("❌", msg);
+      Alert.alert("Lỗi", msg);
+      return;
+    }
 
-    // Chuyển hướng vào trang chủ (Main Tabs)
-    router.replace("/(main)");
+    console.log("🔑 Đang đăng nhập...", { email });
+    setLoading(true);
+
+    try {
+      const result = await login(email, password);
+      console.log("✅ Đăng nhập thành công!", result.user);
+
+      // Save or clear email based on remember me checkbox
+      if (rememberMe) {
+        await AsyncStorage.setItem(STORAGE_KEYS.SAVED_EMAIL, email);
+        await AsyncStorage.setItem(STORAGE_KEYS.REMEMBER_ME, "true");
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEYS.SAVED_EMAIL);
+        await AsyncStorage.removeItem(STORAGE_KEYS.REMEMBER_ME);
+      }
+
+      // Sync guest cart with backend
+      await syncCartAfterLogin();
+
+      // Đăng nhập thành công, chuyển hướng vào trang chủ
+      router.replace("/(main)");
+    } catch (error: any) {
+      const errorMsg = error.message || "Vui lòng thử lại sau!";
+      console.error("❌ Đăng nhập thất bại:", errorMsg);
+      Alert.alert("Đăng nhập thất bại", errorMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -84,9 +141,29 @@ export default function Login() {
         />
       </View>
 
+      {/* Remember Me Checkbox */}
+      <TouchableOpacity
+        style={styles.rememberMeContainer}
+        onPress={() => setRememberMe(!rememberMe)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+          {rememberMe && <Ionicons name="checkmark" size={16} color="#fff" />}
+        </View>
+        <Text style={styles.rememberMeText}>Nhớ tài khoản email</Text>
+      </TouchableOpacity>
+
       {/* Button Sign In */}
-      <TouchableOpacity style={styles.button} onPress={handleSignIn}>
-        <Text style={styles.buttonText}>Sign In</Text>
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleSignIn}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Sign In</Text>
+        )}
       </TouchableOpacity>
 
       <Text style={styles.or}>OR</Text>
@@ -167,6 +244,7 @@ const styles = StyleSheet.create({
   },
 
   buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  buttonDisabled: { opacity: 0.6 },
 
   or: { textAlign: "center", color: "#777", marginVertical: 15 },
 
@@ -186,4 +264,29 @@ const styles = StyleSheet.create({
 
   footerText: { textAlign: "center", color: "#777", marginTop: 15 },
   footerLink: { color: "#47B5FF", fontWeight: "bold" },
+
+  // Remember Me Styles
+  rememberMeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: "#47B5FF",
+    borderRadius: 4,
+    marginRight: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: "#47B5FF",
+  },
+  rememberMeText: {
+    color: "#333",
+    fontSize: 14,
+  },
 });

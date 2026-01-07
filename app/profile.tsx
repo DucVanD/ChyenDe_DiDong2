@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Image,
   Platform,
@@ -11,12 +11,14 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
+import { getStoredUser, logout, UserInfo } from '../services/auth.service';
 
 // 1. Define the type for your menu items
 type MenuItemType = {
   id: string;
-  icon: any; // Using 'any' here prevents errors if the icon name string isn't perfect
+  icon: any;
   label: string;
   value: string;
   type: string;
@@ -24,68 +26,92 @@ type MenuItemType = {
 
 export default function Profile() {
   const router = useRouter();
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Dữ liệu giả lập cho Profile
-  const userProfile = {
-    name: 'Văn Văn Nè',
-    username: 'admin@gmail.com',
-    avatar: require('../assets/images/avatar.jpg'),
+  const loadUser = useCallback(async () => {
+    try {
+      setLoading(true);
+      const storedUser = await getStoredUser();
+      if (storedUser) {
+        setUser(storedUser);
+      } else {
+        // Nếu chưa đăng nhập thì chuyển hướng về login
+        router.replace('/login');
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải thông tin user:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  // Refresh when screen comes into focus (e.g., returning from edit screen)
+  useFocusEffect(
+    useCallback(() => {
+      loadUser();
+    }, [loadUser])
+  );
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
   };
 
-  // 2. Apply the type to your data array
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color="#40BFFF" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Danh mục menu dựa trên dữ liệu thật
   const menuItems: MenuItemType[] = [
-    {
-      id: 'gender',
-      icon: 'female-outline',
-      label: 'Gender',
-      value: 'Male',
-      type: 'text',
-    },
-    {
-      id: 'birthday',
-      icon: 'calendar-outline',
-      label: 'Birthday',
-      value: '12-12-2000',
-      type: 'text',
-    },
     {
       id: 'email',
       icon: 'mail-outline',
       label: 'Email',
-      value: 'rex4dom@gmail.com',
+      value: user?.email || '',
       type: 'text',
     },
     {
       id: 'phone',
       icon: 'phone-portrait-outline',
-      label: 'Phone Number',
-      value: '(307) 555-0133',
+      label: 'Số điện thoại',
+      value: user?.phone || 'Chưa cập nhật',
       type: 'text',
     },
     {
-      id: 'password',
-      icon: 'lock-closed-outline',
-      label: 'Change Password',
-      value: '................',
-      type: 'password',
+      id: 'address',
+      icon: 'location-outline',
+      label: 'Địa chỉ',
+      value: user?.address || 'Chưa cập nhật',
+      type: 'text',
     },
   ];
 
-  // 3. Fix: Explicitly type the 'item' parameter
   const renderMenuItem = (item: MenuItemType) => {
     return (
-      <TouchableOpacity 
-        key={item.id} 
+      <TouchableOpacity
+        key={item.id}
         style={styles.menuItem}
         onPress={() => {
-            console.log(`Pressed ${item.label}`);
+          console.log(`Pressed ${item.label}`);
         }}
       >
         <View style={styles.menuItemLeft}>
           <Ionicons name={item.icon} size={24} color="#40BFFF" style={styles.menuIcon} />
           <Text style={styles.menuLabel}>{item.label}</Text>
         </View>
-        
+
         <View style={styles.menuItemRight}>
           <Text style={styles.menuValue} numberOfLines={1}>{item.value}</Text>
           <Ionicons name="chevron-forward" size={24} color="#9098B1" />
@@ -96,35 +122,49 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* 1. Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#9098B1" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={{ width: 24 }} /> 
+        <Text style={styles.headerTitle}>Hồ sơ cá nhân</Text>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.contentContainer}>
-        
-        {/* 2. User Info Section */}
         <View style={styles.userInfoContainer}>
-           {/* Added a safeguard for the image source to prevent crashes if local image is missing */}
-          <Image 
-            source={userProfile.avatar || { uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
-            style={styles.avatar} 
+          <Image
+            source={user?.avatar ? { uri: user.avatar } : require('../assets/images/avatar.jpg')}
+            style={styles.avatar}
           />
           <View style={styles.userInfoText}>
-            <Text style={styles.userName}>{userProfile.name}</Text>
-            <Text style={styles.userHandle}>{userProfile.username}</Text>
+            <Text style={styles.userName}>{user?.name || 'Người dùng'}</Text>
+            <Text style={styles.userHandle}>{user?.email}</Text>
           </View>
         </View>
 
-        {/* 3. Menu List */}
+        {/* Edit Profile Button */}
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => router.push('/editProfile')}
+        >
+          <Ionicons name="create-outline" size={20} color="#40BFFF" />
+          <Text style={styles.editButtonText}>Chỉnh sửa hồ sơ</Text>
+        </TouchableOpacity>
+
         <View style={styles.menuContainer}>
           {menuItems.map((item) => renderMenuItem(item))}
-        </View>
 
+          <TouchableOpacity
+            style={[styles.menuItem, { marginTop: 20 }]}
+            onPress={handleLogout}
+          >
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="log-out-outline" size={24} color="#FB7181" style={styles.menuIcon} />
+              <Text style={[styles.menuLabel, { color: '#FB7181' }]}>Đăng xuất</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#9098B1" />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -182,7 +222,7 @@ const styles = StyleSheet.create({
     color: '#9098B1',
   },
   menuContainer: {
-    
+
   },
   menuItem: {
     flexDirection: 'row',
@@ -215,5 +255,21 @@ const styles = StyleSheet.create({
     color: '#9098B1',
     marginRight: 10,
     textAlign: 'right',
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EBF0FF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 24,
+    gap: 8,
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#40BFFF',
   },
 });

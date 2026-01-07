@@ -1,7 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import React, { useState, useEffect } from "react";
+import { getCartCount } from "@/services/cart.service";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function MainLayout() {
+  const [cartBadge, setCartBadge] = useState<number | undefined>(undefined);
+
+  // Load cart count
+  const loadCartBadge = async () => {
+    const count = await getCartCount();
+    setCartBadge(count > 0 ? count : undefined);
+  };
+
+  // Auto-refresh badge on focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCartBadge();
+    }, [])
+  );
+
   return (
     <Tabs
       screenOptions={{
@@ -18,7 +36,7 @@ export default function MainLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Trang chủ",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
@@ -33,7 +51,7 @@ export default function MainLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Explore",
+          title: "Khám phá",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "search" : "search-outline"}
@@ -44,12 +62,11 @@ export default function MainLayout() {
         }}
       />
 
-      {/* 3. Cart */}
       <Tabs.Screen
         name="cart"
         options={{
-          title: "Cart",
-          tabBarBadge: 2,
+          title: "Giỏ hàng",
+          tabBarBadge: cartBadge,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "cart" : "cart-outline"}
@@ -64,7 +81,7 @@ export default function MainLayout() {
       <Tabs.Screen
         name="offer"
         options={{
-          title: "Offer",
+          title: "Ưu đãi",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "pricetags" : "pricetags-outline"}
@@ -79,7 +96,7 @@ export default function MainLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: "Account",
+          title: "Tài khoản",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "person" : "person-outline"}
@@ -90,7 +107,7 @@ export default function MainLayout() {
         }}
       />
 
-      
+
     </Tabs>
   );
 }

@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import LottieView from 'lottie-react-native';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get("window");
 
@@ -25,79 +27,87 @@ export default function SuccessScreen() {
   const buttonOpacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Rung thông báo thành công
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
     Animated.sequence([
-        // 1. Icon nảy lên
-        Animated.spring(iconScaleAnim, {
-            toValue: 1,
-            friction: 6,
-            tension: 50,
-            useNativeDriver: true,
+      // 1. Icon nảy lên
+      Animated.spring(iconScaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+      // 2. Chữ và nút hiện ra
+      Animated.parallel([
+        Animated.timing(textOpacityAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
         }),
-        // 2. Chữ và nút hiện ra
-        Animated.parallel([
-            Animated.timing(textOpacityAnim, {
-                toValue: 1,
-                duration: 600,
-                useNativeDriver: true,
-            }),
-            Animated.spring(buttonTranslateYAnim, {
-                toValue: 0,
-                friction: 8,
-                useNativeDriver: true,
-            }),
-            Animated.timing(buttonOpacityAnim, {
-                toValue: 1,
-                duration: 600,
-                useNativeDriver: true,
-            })
-        ])
+        Animated.spring(buttonTranslateYAnim, {
+          toValue: 0,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonOpacityAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        })
+      ])
     ]).start();
   }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
+
       <View style={styles.container}>
         {/* Icon Animation */}
-        <View style={styles.iconWrapper}>
-            <Animated.View 
-                style={[
-                    styles.iconCircle, 
-                    { transform: [{ scale: iconScaleAnim }] } 
-                ]}
-            >
-                <Ionicons name="checkmark-circle" size={70} color="#fff" />
-            </Animated.View>
-        </View>
+        <Animated.View
+          style={[
+            styles.iconWrapper,
+            { transform: [{ scale: iconScaleAnim }] }
+          ]}
+        >
+          <View style={styles.iconCircle}>
+            <LottieView
+              source={{ uri: 'https://assets10.lottiefiles.com/packages/lf20_qw8ewi70.json' }} // Success checkmark
+              autoPlay
+              loop={false}
+              style={{ width: 120, height: 120 }}
+            />
+          </View>
+        </Animated.View>
 
         {/* Text Animation */}
         <Animated.View style={{ opacity: textOpacityAnim, alignItems: 'center' }}>
-            <Text style={styles.title}>Success</Text>
-            <Text style={styles.subtitle}>
-            thank you for shopping using lafyuu
-            </Text>
+          <Text style={styles.title}>Đặt hàng thành công!</Text>
+          <Text style={styles.subtitle}>
+            Cảm ơn bạn đã mua sắm tại cửa hàng chúng tôi
+          </Text>
         </Animated.View>
 
         {/* Button Animation */}
-        <Animated.View 
-            style={{ 
-                opacity: buttonOpacityAnim,
-                transform: [{ translateY: buttonTranslateYAnim }],
-                width: width - 32,
-                marginTop: 32,
-            }}
+        <Animated.View
+          style={{
+            opacity: buttonOpacityAnim,
+            transform: [{ translateY: buttonTranslateYAnim }],
+            width: width - 32,
+            marginTop: 32,
+          }}
         >
-            <TouchableOpacity
+          <TouchableOpacity
             style={styles.button}
             activeOpacity={0.8}
             onPress={() => {
-                router.dismissAll(); 
-                router.replace("/"); 
+              router.dismissAll();
+              router.replace("/");
             }}
-            >
-            <Text style={styles.buttonText}>Back To Home</Text>
-            </TouchableOpacity>
+          >
+            <Text style={styles.buttonText}>Về trang chủ</Text>
+          </TouchableOpacity>
         </Animated.View>
       </View>
     </SafeAreaView>
@@ -114,13 +124,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
-    paddingBottom: 50, 
+    paddingBottom: 50,
   },
-  
+
   // --- ĐÃ SỬA PHẦN NÀY ---
   iconWrapper: {
     marginBottom: 24,
-    alignItems: 'center', 
+    alignItems: 'center',
     justifyContent: 'center',
     // Đã xóa shadow ở đây để tránh bị khung vuông
   },
@@ -131,14 +141,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#40BFFF",
     alignItems: "center",
     justifyContent: "center",
-    
+
     // Shadow chuyển vào đây sẽ bo theo hình tròn
     shadowColor: "#40BFFF",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 10,
-    
+
     // Đã xóa border (viền trắng) theo yêu cầu
   },
 

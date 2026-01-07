@@ -1,49 +1,60 @@
-import React from 'react';
+import { getOrderById, Order, getStatusNumber } from '@/services/order.service';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
+  ActivityIndicator,
+  Image,
+  Platform,
   SafeAreaView,
   ScrollView,
-  Image,
-  TouchableOpacity,
-  Platform,
   StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 
-const OrderDetai = () => {
+const OrderDetail = () => {
   const router = useRouter();
+  const { id } = useLocalSearchParams();
+  const orderId = Number(id);
 
-  // Dữ liệu mẫu (Dummy Data)
-  const products = [
-    {
-      id: '1',
-      name: 'Nike Air Zoom Pegasus 36 Miami',
-      price: '$299,43',
-      image: { uri: 'https://static.nike.com/a/images/c_limit,w_592,f_auto/t_product_v1/i1-665455a5-45de-40fb-945f-c1852b82400d/air-zoom-pegasus-37-running-shoe-mwrTCc.jpg' }, // Thay bằng ảnh thật của bạn
-      isFavorite: true,
-    },
-    {
-      id: '2',
-      name: 'Nike Air Zoom Pegasus 36 Miami',
-      price: '$299,43',
-      image: { uri: 'https://static.nike.com/a/images/c_limit,w_592,f_auto/t_product_v1/i1-512bfa8a-01a0-4971-bd34-9ef68fb6b7fa/air-zoom-pegasus-37-running-shoe-mwrTCc.jpg' },
-      isFavorite: false,
-    },
-  ];
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Các bước trong quy trình vận đơn
-  const steps = ['Packing', 'Shipping', 'Arriving', 'Success'];
-  const currentStep = 2; // 0: Packing, 1: Shipping, 2: Arriving... (Dựa vào hình là đang ở bước 3)
+  const steps = ['Đang chuẩn bị', 'Đã xác nhận', 'Đang giao hàng', 'Thành công'];
+
+  useEffect(() => {
+    const fetchOrderDetail = async () => {
+      if (!orderId) return;
+      try {
+        setLoading(true);
+        const data = await getOrderById(orderId);
+        setOrder(data);
+      } catch (error) {
+        console.error("Lỗi khi tải chi tiết đơn hàng:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrderDetail();
+  }, [orderId]);
 
   // Component hiển thị Stepper (Thanh trạng thái)
   const renderStepper = () => {
+    if (!order) return null;
+
+    // Convert string status to number for stepper
+    const statusNumber = getStatusNumber(order.status || 'PENDING');
+    const currentStep = statusNumber <= 3 ? statusNumber : 3;
+
     return (
       <View style={styles.stepperContainer}>
         {steps.map((step, index) => {
           const isActive = index <= currentStep;
+          const isCurrent = index === currentStep;
           const isLast = index === steps.length - 1;
 
           return (
@@ -51,18 +62,18 @@ const OrderDetai = () => {
               {/* Vòng tròn icon */}
               <View style={styles.stepItem}>
                 {isActive ? (
-                  <Ionicons name="checkmark-circle" size={32} color="#40BFFF" />
+                  <Ionicons name="checkmark-circle" size={32} color={statusNumber === 4 ? "#FB7181" : "#40BFFF"} />
                 ) : (
                   <Ionicons name="checkmark-circle-outline" size={32} color="#EBF0FF" />
                 )}
-                <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
+                <Text style={[styles.stepLabel, isActive && styles.stepLabelActive, statusNumber === 4 && isActive && { color: '#FB7181' }]}>
                   {step}
                 </Text>
               </View>
 
               {/* Đường kẻ nối (Line) - Không vẽ cho phần tử cuối cùng */}
               {!isLast && (
-                <View style={[styles.stepLine, index < currentStep && styles.stepLineActive]} />
+                <View style={[styles.stepLine, index < currentStep && styles.stepLineActive, statusNumber === 4 && index < currentStep && { backgroundColor: '#FB7181' }]} />
               )}
             </View>
           );
@@ -71,6 +82,25 @@ const OrderDetai = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#40BFFF" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!order) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Không tìm thấy đơn hàng</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+          <Text style={{ color: '#40BFFF' }}>Quay lại</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* 1. Header */}
@@ -78,91 +108,91 @@ const OrderDetai = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#9098B1" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Details</Text>
+        <Text style={styles.headerTitle}>Chi tiết đơn hàng #{order.id || ''}</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        
+
         {/* 2. Stepper Section */}
-        {renderStepper()}
+        {getStatusNumber(order.status || 'PENDING') === 4 ? (
+          <View style={{ alignItems: 'center', marginBottom: 24 }}>
+            <Ionicons name="close-circle" size={48} color="#FB7181" />
+            <Text style={{ color: '#FB7181', fontWeight: '700', marginTop: 8 }}>Đơn hàng đã bị hủy</Text>
+            {order.cancelReason && <Text style={{ color: '#9098B1', fontSize: 12, marginTop: 4 }}>Lý do: {order.cancelReason}</Text>}
+          </View>
+        ) : renderStepper()}
 
         {/* 3. Product List */}
-        <Text style={styles.sectionTitle}>Product</Text>
+        <Text style={styles.sectionTitle}>Sản phẩm</Text>
         <View style={styles.productList}>
-          {products.map((item) => (
+          {order.orderDetails?.map((item) => (
             <View key={item.id} style={styles.productCard}>
-              <Image source={item.image} style={styles.productImage} resizeMode="contain" />
+              <Image source={{ uri: item.productImage }} style={styles.productImage} resizeMode="contain" />
               <View style={styles.productInfo}>
-                <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-                <Text style={styles.productPrice}>{item.price}</Text>
+                <Text style={styles.productName} numberOfLines={2}>{item.productName}</Text>
+                <Text style={styles.productPrice}>{(item.priceBuy || 0).toLocaleString('vi-VN')}đ x {item.quantity}</Text>
               </View>
-              <TouchableOpacity>
-                 <Ionicons 
-                    name={item.isFavorite ? "heart" : "heart-outline"} 
-                    size={24} 
-                    color={item.isFavorite ? "#FB7181" : "#9098B1"} 
-                 />
-              </TouchableOpacity>
+              <View>
+                <Text style={styles.productPrice}>{(item.amount || 0).toLocaleString('vi-VN')}đ</Text>
+              </View>
             </View>
           ))}
         </View>
 
         {/* 4. Shipping Details */}
-        <Text style={styles.sectionTitle}>Shipping Details</Text>
+        <Text style={styles.sectionTitle}>Thông tin giao hàng</Text>
         <View style={styles.detailCard}>
           <View style={styles.row}>
-            <Text style={styles.label}>Date Shipping</Text>
-            <Text style={styles.value}>January 16, 2020</Text>
+            <Text style={styles.label}>Ngày đặt</Text>
+            <Text style={styles.value}>{order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '-'}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.label}>Shipping</Text>
-            <Text style={styles.value}>POS Reggular</Text>
+            <Text style={styles.label}>Thanh toán</Text>
+            <Text style={styles.value}>{order.paymentMethod}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.label}>No. Resi</Text>
-            <Text style={styles.value}>000192848573</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Address</Text>
+            <Text style={styles.label}>Địa chỉ</Text>
             <Text style={[styles.value, styles.addressValue]}>
-              2727 New Owerri, Owerri, Imo State 78410
+              {order.receiverAddress}
             </Text>
           </View>
+          {order.note && (
+            <View style={styles.row}>
+              <Text style={styles.label}>Ghi chú</Text>
+              <Text style={styles.value}>{order.note}</Text>
+            </View>
+          )}
         </View>
 
         {/* 5. Payment Details */}
-        <Text style={styles.sectionTitle}>Payment Details</Text>
+        <Text style={styles.sectionTitle}>Chi tiết thanh toán</Text>
         <View style={styles.detailCard}>
           <View style={styles.row}>
-            <Text style={styles.label}>Items (3)</Text>
-            <Text style={styles.value}>$598.86</Text>
+            <Text style={styles.label}>Tạm tính ({order.orderDetails?.length} sản phẩm)</Text>
+            <Text style={styles.value}>{(order.subtotal || 0).toLocaleString('vi-VN')}đ</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.label}>Shipping</Text>
-            <Text style={styles.value}>$40.00</Text>
+            <Text style={styles.label}>Phí vận chuyển</Text>
+            <Text style={styles.value}>{(order.shippingFee || 0).toLocaleString('vi-VN')}đ</Text>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Import charges</Text>
-            <Text style={styles.value}>$128.00</Text>
-          </View>
-          
-          {/* Dashed Line */}
+
           <View style={styles.dashedLine} />
 
           <View style={styles.row}>
-            <Text style={styles.totalLabel}>Total Price</Text>
-            <Text style={styles.totalPrice}>$766.86</Text>
+            <Text style={styles.totalLabel}>Tổng cộng</Text>
+            <Text style={styles.totalPrice}>{(order.totalAmount || 0).toLocaleString('vi-VN')}đ</Text>
           </View>
         </View>
 
-        {/* 6. Notify Button */}
-        <TouchableOpacity style={styles.notifyButton}>
-          <Text style={styles.notifyButtonText}>Notify Me</Text>
-        </TouchableOpacity>
+        {getStatusNumber(order.status || 'PENDING') === 0 && (
+          <TouchableOpacity style={[styles.notifyButton, { backgroundColor: '#FB7181' }]}>
+            <Text style={styles.notifyButtonText}>Hủy đơn hàng</Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -201,26 +231,26 @@ const styles = StyleSheet.create({
   stepItemWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1, // Để chia đều không gian
+    flex: 1,
   },
   stepItem: {
     alignItems: 'center',
-    zIndex: 1, // Để icon nằm đè lên line nếu cần
+    zIndex: 1,
     backgroundColor: '#fff',
   },
   stepLabel: {
-    fontSize: 10, // Font nhỏ
+    fontSize: 10,
     color: '#9098B1',
     marginTop: 8,
     textAlign: 'center',
   },
   stepLabelActive: { color: '#40BFFF' },
   stepLine: {
-    flex: 1, // Line chiếm hết khoảng trống còn lại giữa các icon
+    flex: 1,
     height: 2,
     backgroundColor: '#EBF0FF',
-    marginBottom: 20, // Căn chỉnh line ngang hàng với tâm icon
-    marginHorizontal: -10, // Kỹ thuật để line nối liền
+    marginBottom: 20,
+    marginHorizontal: -10,
     zIndex: -1,
   },
   stepLineActive: { backgroundColor: '#40BFFF' },
@@ -256,7 +286,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#223263',
     marginBottom: 4,
-    width: '90%', // Tránh đè lên icon tim
+    width: '90%',
   },
   productPrice: {
     fontSize: 12,
@@ -285,11 +315,11 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 12,
     color: '#223263',
-    flex: 2, // Dành nhiều chỗ hơn cho giá trị
+    flex: 2,
     textAlign: 'right',
   },
   addressValue: {
-    lineHeight: 18, // Tăng khoảng cách dòng cho địa chỉ dài
+    lineHeight: 18,
   },
   dashedLine: {
     height: 1,
@@ -330,4 +360,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OrderDetai;
+export default OrderDetail;

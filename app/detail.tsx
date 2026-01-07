@@ -1,53 +1,113 @@
-import { useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { getProductById, getRelatedProducts, Product } from "@/services/product.service";
+import { addToCart } from "@/services/cart.service";
+import { showAlert } from "@/utils/alert";
+import Skeleton from "@/app/components/common/Skeleton";
+import * as Haptics from 'expo-haptics';
+import React, { useEffect, useState } from "react";
 
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import {
-    Image,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useWindowDimensions,
-    View
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 
 // Dữ liệu giả lập
 const SIZES = [6, 6.5, 7, 7.5, 8, 8.5];
 const COLORS = ["#FFC833", "#40BFFF", "#FB7181", "#53D1B6", "#5C61F4", "#223263"];
-const PRODUCT_IMAGES = [
-  "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80", // Đỏ
-  "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=800&q=80", // Xanh
-  "https://images.unsplash.com/photo-1605348532760-6753d2c43329?auto=format&fit=crop&w=800&q=80", // Đen
-];
-
-const SUGGESTED_PRODUCTS = [
-  { id: 1, name: "FS - Nike Air Max 270 React...", price: "$299,43", oldPrice: "$534,33", off: "24% Off", img: "https://images.unsplash.com/photo-1542291026-7eec264c27ff" },
-  { id: 2, name: "FS - QUILTED MAXI CROSS...", price: "$299,43", oldPrice: "$534,33", off: "24% Off", img: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa" },
-  { id: 3, name: "FS - Nike Air Max 270 React...", price: "$299,43", oldPrice: "$534,33", off: "24% Off", img: "https://images.unsplash.com/photo-1542291026-7eec264c27ff" },
-];
 
 export default function ProductDetail() {
-  const { id } = useLocalSearchParams(); 
-  
-  console.log("Product ID:", id);
+  const { id } = useLocalSearchParams();
+  const productId = Number(id);
+
   const router = useRouter();
-  const { width } = useWindowDimensions(); // Lấy chiều rộng màn hình động
+  const { width } = useWindowDimensions();
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addingToCart, setAddingToCart] = useState(false);
+
   const [selectedSize, setSelectedSize] = useState(6.5);
   const [selectedColor, setSelectedColor] = useState(1);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [quantity, setQuantity] = useState(1);
 
-  // Xử lý sự kiện scroll ảnh
+  useEffect(() => {
+    const fetchDetail = async () => {
+      if (!productId) return;
+      try {
+        setLoading(true);
+        const data = await getProductById(productId);
+        setProduct(data);
+
+        // Lấy sản phẩm liên quan
+        const related = await getRelatedProducts(productId, data.categoryId);
+        setRelatedProducts(related);
+      } catch (error) {
+        console.error("Lỗi khi tải chi tiết sản phẩm:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDetail();
+  }, [productId]);
+
   const onScroll = (event: any) => {
     const slide = Math.ceil(
       event.nativeEvent.contentOffset.x / event.nativeEvent.layoutMeasurement.width
     );
     if (slide !== activeSlide) {
       setActiveSlide(slide);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setAddingToCart(true);
+    try {
+      const result = await addToCart(
+        {
+          id: product.id,
+          name: product.name,
+          salePrice: product.salePrice,
+          discountPrice: product.discountPrice,
+          image: product.image || '',
+          stock: product.qty,
+        },
+        quantity
+      );
+
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showAlert('Thành công', result.message, [
+          {
+            text: 'Tiếp tục mua',
+            style: 'cancel',
+          },
+          {
+            text: 'Xem giỏ hàng',
+            onPress: () => router.push('/(main)/cart'),
+          },
+        ]);
+      } else {
+        showAlert('Thông báo', result.message);
+      }
+    } catch (error) {
+      showAlert('Lỗi', 'Có lỗi xảy ra khi thêm vào giỏ hàng');
+    } finally {
+      setAddingToCart(false);
     }
   };
 
@@ -66,6 +126,39 @@ export default function ProductDetail() {
     return <View style={{ flexDirection: "row" }}>{stars}</View>;
   };
 
+  if (loading || !product) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Skeleton width={40} height={40} borderRadius={20} />
+          <Skeleton width="60%" height={24} style={{ marginLeft: 16 }} />
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Skeleton width="100%" height={width} />
+          <View style={{ padding: 16 }}>
+            <Skeleton width="80%" height={24} borderRadius={4} />
+            <Skeleton width="40%" height={20} style={{ marginTop: 12 }} />
+            <View style={{ height: 100, marginTop: 24 }}>
+              <Skeleton width="100%" height={80} borderRadius={8} />
+            </View>
+            <Skeleton width="100%" height={100} style={{ marginTop: 24 }} />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (!product) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Không tìm thấy sản phẩm</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+          <Text style={{ color: '#40BFFF' }}>Quay lại</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {/* HEADER */}
@@ -74,10 +167,10 @@ export default function ProductDetail() {
           <Ionicons name="chevron-back" size={24} color="#9098B1" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          Nike Air Zoom Pegasus...
+          {product.name}
         </Text>
         <View style={{ flexDirection: "row", gap: 16 }}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/searchProduct")}>
             <Ionicons name="search-outline" size={24} color="#9098B1" />
           </TouchableOpacity>
           <TouchableOpacity>
@@ -87,8 +180,8 @@ export default function ProductDetail() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* 1. SLIDER ẢNH (FULL WIDTH) - Không nằm trong View có padding */}
+
+        {/* 1. SLIDER ẢNH (FULL WIDTH) - Hiện tại backend chỉ có 1 ảnh */}
         <View>
           <ScrollView
             horizontal
@@ -97,45 +190,36 @@ export default function ProductDetail() {
             onScroll={onScroll}
             scrollEventThrottle={16}
           >
-            {PRODUCT_IMAGES.map((img, index) => (
-              <Image 
-                key={index} 
-                source={{ uri: img }} 
-                // Quan trọng: Gán width bằng width màn hình tại đây
-                style={[styles.productImage, { width: width }]} 
-              />
-            ))}
+            <Image
+              source={{ uri: product.image }}
+              style={[styles.productImage, { width: width }]}
+            />
           </ScrollView>
-          {/* Dots */}
-          <View style={styles.dotsContainer}>
-            {PRODUCT_IMAGES.map((_, i) => (
-              <View
-                key={i}
-                style={[styles.dot, activeSlide === i ? styles.activeDot : styles.inactiveDot]}
-              />
-            ))}
-          </View>
         </View>
 
-        {/* 2. PHẦN THÔNG TIN (CÓ PADDING) */}
+        {/* 2. PHẦN THÔNG TIN */}
         <View style={styles.section}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <Text style={styles.productName}>Nike Air Zoom Pegasus 36 Miami</Text>
+            <Text style={styles.productName}>{product.name}</Text>
             <TouchableOpacity>
               <Ionicons name="heart-outline" size={24} color="#9098B1" />
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.ratingContainer}>
             {renderStars(4)}
           </View>
 
-          <Text style={styles.price}>$299,43</Text>
+          <Text style={styles.price}>
+            {product.discountPrice
+              ? product.discountPrice.toLocaleString('vi-VN')
+              : product.salePrice.toLocaleString('vi-VN')}đ
+          </Text>
         </View>
 
         {/* SELECT SIZE */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Size</Text>
+          <Text style={styles.sectionTitle}>Chọn Size</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
             {SIZES.map((size) => (
               <TouchableOpacity
@@ -153,7 +237,7 @@ export default function ProductDetail() {
 
         {/* SELECT COLOR */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Color</Text>
+          <Text style={styles.sectionTitle}>Chọn màu</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
             {COLORS.map((color, index) => (
               <TouchableOpacity
@@ -167,72 +251,80 @@ export default function ProductDetail() {
           </ScrollView>
         </View>
 
-        {/* SPECIFICATION */}
+        {/* QUANTITY SELECTOR */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Specification</Text>
-          <View style={styles.specRow}>
-            <Text style={styles.specLabel}>Shown:</Text>
-            <Text style={styles.specValue}>Laser Blue/Anthracite/Watermelon/White</Text>
+          <Text style={styles.sectionTitle}>Số lượng</Text>
+          <View style={styles.quantityWrapper}>
+            <TouchableOpacity
+              style={styles.qtyActionBtn}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setQuantity(Math.max(1, quantity - 1));
+              }}
+            >
+              <Ionicons name="remove" size={20} color="#9098B1" />
+            </TouchableOpacity>
+
+            <View style={styles.qtyDisplay}>
+              <Text style={styles.qtyDisplayText}>{quantity}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.qtyActionBtn}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setQuantity(Math.min(product.qty, quantity + 1));
+              }}
+            >
+              <Ionicons name="add" size={20} color="#40BFFF" />
+            </TouchableOpacity>
+
+            <Text style={styles.stockText}>Kho: {product.qty}</Text>
           </View>
-          <View style={styles.specRow}>
-            <Text style={styles.specLabel}>Style:</Text>
-            <Text style={styles.specValue}>CD0113-400</Text>
-          </View>
-          <Text style={styles.descriptionText}>
-            The Nike Air Max 270 React ENG combines a full-length React foam midsole with a 270 Max Air unit for unrivaled comfort and a striking visual experience.
-          </Text>
         </View>
 
-        {/* REVIEW */}
+        {/* SPECIFICATION */}
         <View style={styles.section}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={styles.sectionTitle}>Review Product</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeMore}>See More</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
-             {renderStars(4.5)}
-             <Text style={styles.ratingCount}>4.5 (5 Review)</Text>
-          </View>
-          
-          <View style={styles.reviewItem}>
-             <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10}}>
-                <Image 
-                  source={{ uri: "https://randomuser.me/api/portraits/men/32.jpg" }} 
-                  style={styles.avatar} 
-                />
-                <View>
-                    <Text style={styles.reviewerName}>James Lawson</Text>
-                    {renderStars(4)}
-                </View>
-             </View>
-             <Text style={styles.reviewText}>
-                air max are always very comfortable fit, clean and just perfect in every way.
-             </Text>
-             <View style={{flexDirection: 'row', gap: 10, marginTop: 10}}>
-                 <Image source={{uri: PRODUCT_IMAGES[0]}} style={styles.reviewImage} />
-                 <Image source={{uri: PRODUCT_IMAGES[1]}} style={styles.reviewImage} />
-                 <Image source={{uri: PRODUCT_IMAGES[2]}} style={styles.reviewImage} />
-             </View>
-             <Text style={styles.reviewDate}>December 10, 2016</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Chi tiết sản phẩm</Text>
+          <Text style={styles.descriptionText}>
+            {product.description}
+          </Text>
+          {product.detail && (
+            <Text style={[styles.descriptionText, { marginTop: 12 }]}>
+              {product.detail}
+            </Text>
+          )}
         </View>
 
         {/* SUGGESTED */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>You Might Also Like</Text>
+          <Text style={styles.sectionTitle}>Sản phẩm liên quan</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 10 }}>
-            {SUGGESTED_PRODUCTS.map((item) => (
-                <View key={item.id} style={styles.suggestCard}>
-                   <Image source={{uri: item.img}} style={styles.suggestImg} />
-                   <Text style={styles.suggestName} numberOfLines={2}>{item.name}</Text>
-                   <Text style={styles.suggestPrice}>{item.price}</Text>
-                   <View style={{flexDirection: 'row', gap: 8}}>
-                       <Text style={styles.suggestOldPrice}>{item.oldPrice}</Text>
-                       <Text style={styles.suggestOff}>{item.off}</Text>
-                   </View>
-                </View>
+            {relatedProducts.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.suggestCard}
+                onPress={() => router.push({
+                  pathname: "/detail",
+                  params: { id: item.id }
+                })}
+              >
+                <Image source={{ uri: item.image }} style={styles.suggestImg} />
+                <Text style={styles.suggestName} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.suggestPrice}>
+                  {item.discountPrice
+                    ? item.discountPrice.toLocaleString('vi-VN')
+                    : item.salePrice.toLocaleString('vi-VN')}đ
+                </Text>
+                {item.discountPrice && (
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Text style={styles.suggestOldPrice}>{item.salePrice.toLocaleString('vi-VN')}đ</Text>
+                    <Text style={styles.suggestOff}>
+                      {Math.round((1 - item.discountPrice / item.salePrice) * 100)}% Giảm
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
@@ -241,9 +333,17 @@ export default function ProductDetail() {
 
       {/* FOOTER */}
       <View style={styles.footer}>
-          <TouchableOpacity style={styles.addToCartBtn}>
-             <Text style={styles.addToCartText}>Add To Cart</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.addToCartBtn, addingToCart && styles.addToCartBtnDisabled]}
+          onPress={handleAddToCart}
+          disabled={addingToCart || !product}
+        >
+          {addingToCart ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.addToCartText}>Thêm vào giỏ hàng</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
     </SafeAreaView>
@@ -260,7 +360,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  
+
   // Header
   header: {
     flexDirection: "row",
@@ -373,6 +473,40 @@ const styles = StyleSheet.create({
   },
   specLabel: { fontSize: 12, color: "#223263", flex: 1 },
   specValue: { fontSize: 12, color: "#9098B1", flex: 2, textAlign: 'right' },
+  qtyText: {
+    fontSize: 12,
+    color: "#223263",
+  },
+
+  // New Quantity Selector Styles
+  quantityWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  qtyActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#EBF0FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qtyDisplay: {
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  qtyDisplayText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#223263',
+  },
+  stockText: {
+    fontSize: 12,
+    color: '#9098B1',
+    marginLeft: 8,
+  },
   descriptionText: {
     fontSize: 12,
     color: "#9098B1",
@@ -392,12 +526,12 @@ const styles = StyleSheet.create({
 
   // Suggest
   suggestCard: {
-      width: 141,
-      borderWidth: 1,
-      borderColor: "#EBF0FF",
-      borderRadius: 5,
-      padding: 16,
-      backgroundColor: "#fff"
+    width: 141,
+    borderWidth: 1,
+    borderColor: "#EBF0FF",
+    borderRadius: 5,
+    padding: 16,
+    backgroundColor: "#fff"
   },
   suggestImg: { width: 109, height: 109, borderRadius: 5, marginBottom: 8, alignSelf: 'center' },
   suggestName: { fontSize: 12, fontWeight: "700", color: "#223263", marginBottom: 4, height: 36 },
@@ -407,26 +541,30 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: '#fff',
-      padding: 16,
-      borderTopWidth: 1,
-      borderTopColor: '#EBF0FF'
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#EBF0FF'
   },
   addToCartBtn: {
-      backgroundColor: '#40BFFF',
-      borderRadius: 5,
-      height: 57,
-      justifyContent: 'center',
-      alignItems: 'center',
-      shadowColor: "#40BFFF",
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.24,
-      shadowRadius: 20,
-      elevation: 5
+    backgroundColor: '#40BFFF',
+    borderRadius: 5,
+    height: 57,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: "#40BFFF",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 20,
+    elevation: 5
+  },
+  addToCartBtnDisabled: {
+    backgroundColor: '#9098B1',
+    opacity: 0.6,
   },
   addToCartText: { fontSize: 14, fontWeight: "700", color: "#fff" }
 });

@@ -19,8 +19,8 @@ export default function OfferScreen() {
         <Text style={styles.headerTitle}>Offer</Text>
       </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* 1. BLUE COUPON BANNER */}
@@ -39,7 +39,7 @@ export default function OfferScreen() {
             style={styles.bannerImage}
           />
           <View style={styles.bannerOverlay}>
-            <Text style={styles.bannerTitle}>Super Flash Sale</Text>
+            <Text style={styles.bannerTitle}>Khuyến Mãi Đặc Biệt</Text>
             <Text style={styles.bannerSubtitle}>50% Off</Text>
 
             <View style={styles.timerContainer}>
@@ -67,16 +67,16 @@ export default function OfferScreen() {
             style={styles.bannerImage}
           />
           <View style={styles.bannerOverlay}>
-            <Text style={styles.bannerTitle}>90% Off Super Mega Sale</Text>
+            <Text style={styles.bannerTitle}>Giảm Giá 90% Siêu Hấp Dẫn</Text>
             <Text style={styles.specialText}>Special birthday Lafyuu</Text>
           </View>
         </View>
 
         {/* 4. LIST SẢN PHẨM GIẢM GIÁ (Giữ nguyên component cũ) */}
         <View style={styles.productListContainer}>
-             <ProductDiscount />
+          <ProductDiscount />
         </View>
-       
+
       </ScrollView>
     </SafeAreaView>
   );

@@ -22,6 +22,10 @@ import ProductCategory from "@/app/components/Home/ProductCategory";
 import ProductFlashSale from "@/app/components/Home/ProductFlashSale";
 import ProductMegaSale from "@/app/components/Home/ProductMegaSale";
 import ProductRecommend from "@/app/components/Home/ProductRecommend";
+import { getCategories, Category } from "@/services/category.service";
+import { getLatestProducts, Product } from "@/services/product.service";
+import { ActivityIndicator } from "react-native";
+import Skeleton from "@/app/components/common/Skeleton";
 
 /* ================= CONSTANT ================= */
 const { width } = Dimensions.get("window");
@@ -45,30 +49,44 @@ export default function Home() {
   const [isManualScrolling, setIsManualScrolling] = useState(false);
   const bannerRef = useRef<FlatList>(null);
 
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [latestProducts, setLatestProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [cats, products] = await Promise.all([
+          getCategories(),
+          getLatestProducts(8)
+        ]);
+        setCategories(cats);
+        setLatestProducts(products);
+      } catch (error) {
+        console.error("Lỗi khi tải dữ liệu trang chủ:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   /* ================= DATA ================= */
   const bannerData: BannerType[] = [
     {
       id: 1,
-      title: "Super Flash Sale",
-      subtitle: "50% Off",
+      title: "Siêu Giảm Giá",
+      subtitle: "Giảm tới 50%",
       image:
         "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&w=1000",
       showTimer: true,
     },
     {
       id: 2,
-      title: "New Collection",
-      subtitle: "Summer 2024",
+      title: "Sưu Tập Mới",
+      subtitle: "Hè 2024",
       image:
         "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&w=1000",
-      showTimer: false,
-    },
-    {
-      id: 3,
-      title: "Best Sellers",
-      subtitle: "Up to 70%",
-      image:
-        "https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?auto=format&w=1000",
       showTimer: false,
     },
   ];
@@ -123,6 +141,54 @@ export default function Home() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        {/* HEADER SKELETON */}
+        <View style={styles.header}>
+          <Skeleton width="80%" height={46} borderRadius={5} />
+          <Skeleton width={24} height={24} borderRadius={12} />
+          <Skeleton width={24} height={24} borderRadius={12} />
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* BANNER SKELETON */}
+          <View style={styles.bannerContainer}>
+            <Skeleton width="100%" height={206} borderRadius={8} />
+          </View>
+
+          {/* CATEGORY SKELETON */}
+          <View style={styles.sectionHeader}>
+            <Skeleton width={100} height={20} />
+          </View>
+          <View style={{ flexDirection: 'row', padding: 16, gap: 12 }}>
+            {[1, 2, 3, 4].map((i) => (
+              <View key={i} style={{ alignItems: 'center' }}>
+                <Skeleton width={50} height={50} borderRadius={25} />
+                <Skeleton width={40} height={10} style={{ marginTop: 8 }} />
+              </View>
+            ))}
+          </View>
+
+          {/* PRODUCT LIST SKELETON */}
+          <View style={styles.sectionHeader}>
+            <Skeleton width={100} height={20} />
+          </View>
+          <View style={{ flexDirection: 'row', padding: 16, gap: 12 }}>
+            {[1, 2].map((i) => (
+              <View key={i} style={{ flex: 1, borderWidth: 1, borderColor: '#EBF0FF', padding: 16, borderRadius: 5 }}>
+                <Skeleton width="100%" height={100} borderRadius={5} />
+                <Skeleton width="100%" height={15} style={{ marginTop: 12 }} />
+                <Skeleton width="60%" height={15} style={{ marginTop: 8 }} />
+                <Skeleton width="40%" height={15} style={{ marginTop: 8 }} />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* HEADER */}
@@ -130,19 +196,19 @@ export default function Home() {
         <View style={styles.searchBox}>
           <Ionicons name="search-outline" size={20} color="#40BFFF" />
           {/* ============ CẬP NHẬT PHẦN NÀY ============ */}
-          <TextInput 
-            placeholder="Search Product" 
+          <TextInput
+            placeholder="Tìm kiếm sản phẩm"
             style={styles.searchInput}
             returnKeyType="search" // Đổi nút Enter thành Search
             onSubmitEditing={(event) => {
-                // Lấy từ khóa người dùng nhập
-                const query = event.nativeEvent.text;
-                // Chuyển trang và truyền params (tùy chọn)
-                router.push({
-                    pathname: "/searchProduct",
-                    params: { q: query } // Truyền từ khóa qua trang kia để lọc
-                });
-            }} 
+              // Lấy từ khóa người dùng nhập
+              const query = event.nativeEvent.text;
+              // Chuyển trang và truyền params (tùy chọn)
+              router.push({
+                pathname: "/searchProduct",
+                params: { q: query } // Truyền từ khóa qua trang kia để lọc
+              });
+            }}
           />
           {/* =========================================== */}
         </View>
@@ -187,21 +253,21 @@ export default function Home() {
         </View>
 
         {/* CATEGORY */}
-        <Section title="Category" onPress={() => router.push("/categorys")} />
-        <ProductCategory />
+        <Section title="Danh mục" onPress={() => router.push("/categorys")} />
+        <ProductCategory categories={categories.filter(cat => cat.parentId)} />
 
         {/* FLASH SALE */}
-        <Section title="Flash Sale" onPress={() => router.push("/(main)/offer")} />
-        <ProductFlashSale />
+        <Section title="Giá sốc" onPress={() => router.push("/(main)/offer")} />
+        <ProductFlashSale products={latestProducts.slice(0, 4)} />
 
         {/* MEGA SALE */}
-        <Section title="Mega Sale" onPress={() => router.push("/(main)/offer")} />
-        <ProductMegaSale />
+        <Section title="Siêu giảm giá" onPress={() => router.push("/(main)/offer")} />
+        <ProductMegaSale products={latestProducts.slice(4, 8)} />
 
         {/* RECOMMEND */}
-        <Section 
-            title="Recommended Product" 
-            onPress={() => router.push("/product")} 
+        <Section
+          title="Gợi ý sản phẩm"
+          onPress={() => router.push("/explore")}
         />
 
         <View style={styles.recommendBanner}>
@@ -212,14 +278,14 @@ export default function Home() {
             style={styles.recommendImage}
           />
           <View style={styles.recommendOverlay}>
-            <Text style={styles.recommendTitle}>Recommended Product</Text>
+            <Text style={styles.recommendTitle}>Gợi ý sản phẩm</Text>
             <Text style={styles.recommendSubtitle}>
-              We recommend the best for you
+              Chúng tôi đề xuất tốt nhất cho bạn
             </Text>
           </View>
         </View>
 
-        <ProductRecommend />
+        <ProductRecommend products={latestProducts} />
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>

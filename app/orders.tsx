@@ -1,78 +1,79 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  TouchableOpacity,
-  Platform,
-  StatusBar,
-} from 'react-native';
+import { getMyOrders, Order, getStatusNumber } from '@/services/order.service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-// Dữ liệu mẫu
-const ordersData = [
-  {
-    id: '1',
-    orderCode: 'LQNSU346JK',
-    orderDate: 'August 1, 2017',
-    status: 'Shipping',
-    itemsCount: 2,
-    price: '$299,43',
-  },
-  {
-    id: '2',
-    orderCode: 'SDG1345KJD',
-    orderDate: 'August 1, 2017',
-    status: 'Shipping',
-    itemsCount: 1,
-    price: '$299,43',
-  },
-  {
-    id: '3',
-    orderCode: 'QWES1234AD',
-    orderDate: 'August 2, 2017',
-    status: 'Arriving',
-    itemsCount: 3,
-    price: '$150,00',
-  },
-];
+const STATUS_MAP: { [key: number]: { label: string, color: string } } = {
+  0: { label: 'Chờ xác nhận', color: '#FFC107' },
+  1: { label: 'Đã xác nhận', color: '#40BFFF' },
+  2: { label: 'Đang giao hàng', color: '#5C61F4' },
+  3: { label: 'Đã hoàn thành', color: '#53D1B6' },
+  4: { label: 'Đã hủy', color: '#FB7181' },
+};
 
 const OrderS = () => {
   const router = useRouter();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const renderOrderItem = ({ item }) => {
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await getMyOrders(0, { size: 50 });
+        setOrders(response.data?.orders || []);
+      } catch (error) {
+        console.error("Lỗi khi tải đơn hàng:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
+
+  const renderOrderItem = ({ item }: { item: Order }) => {
+    const statusNumber = getStatusNumber(item.status || 'PENDING');
+    const statusInfo = STATUS_MAP[statusNumber] || { label: 'Không xác định', color: '#9098B1' };
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.orderCard}
-        // --- PHẦN SỬA ĐỔI Ở ĐÂY ---
         onPress={() => {
-            // Chuyển hướng sang màn hình OrderDetail
-            // Lưu ý: Đảm bảo bạn đã tạo file 'app/orderDetail.js'
-            router.push("/orderDetail"); 
+          router.push({
+            pathname: "/orderDetail",
+            params: { id: item.id }
+          });
         }}
-        // ---------------------------
       >
-        <Text style={styles.orderCode}>{item.orderCode}</Text>
-        <Text style={styles.orderDate}>Order at E-comm : {item.orderDate}</Text>
+        <Text style={styles.orderCode}>Mã ĐH: #{item.id || ''}</Text>
+        <Text style={styles.orderDate}>Ngày đặt: {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '-'}</Text>
 
         <View style={styles.dashedLine} />
 
         <View style={styles.rowDetail}>
-          <Text style={styles.label}>Order Status</Text>
-          <Text style={styles.valueText}>{item.status}</Text>
+          <Text style={styles.label}>Trạng thái</Text>
+          <Text style={[styles.valueText, { color: statusInfo.color, fontWeight: '700' }]}>{statusInfo.label}</Text>
         </View>
 
         <View style={styles.rowDetail}>
-          <Text style={styles.label}>Items</Text>
-          <Text style={styles.valueText}>{item.itemsCount} Items purchased</Text>
+          <Text style={styles.label}>Sản phẩm</Text>
+          <Text style={styles.valueText}>{item.orderDetails?.length || 0} sản phẩm</Text>
         </View>
 
         <View style={styles.rowDetail}>
-          <Text style={styles.label}>Price</Text>
-          <Text style={styles.priceValue}>{item.price}</Text>
+          <Text style={styles.label}>Tổng tiền</Text>
+          <Text style={styles.priceValue}>{(item.totalAmount || 0).toLocaleString('vi-VN')}đ</Text>
         </View>
       </TouchableOpacity>
     );
@@ -84,17 +85,29 @@ const OrderS = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#9098B1" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order</Text>
-        <View style={{ width: 24 }} /> 
+        <Text style={styles.headerTitle}>Đơn hàng của tôi</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <FlatList
-        data={ordersData}
-        renderItem={renderOrderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#40BFFF" />
+        </View>
+      ) : (
+        <FlatList
+          data={orders}
+          renderItem={renderOrderItem}
+          keyExtractor={(item) => (item.id || '').toString()}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', marginTop: 50 }}>
+              <Ionicons name="bag-outline" size={64} color="#EBF0FF" />
+              <Text style={{ color: '#9098B1', marginTop: 16 }}>Bạn chưa có đơn hàng nào</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
