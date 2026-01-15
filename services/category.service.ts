@@ -19,3 +19,11 @@ export const getCategories = async (): Promise<Category[]> => {
         throw new Error(error.response?.data?.message || "Không thể lấy danh sách danh mục");
     }
 };
+export const getCategoryById = async (id: number): Promise<Category> => {
+    try {
+        const response = await httpAxios.get(`${ENDPOINTS.categories}/${id}`);
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Không thể lấy thông tin danh mục");
+    }
+};

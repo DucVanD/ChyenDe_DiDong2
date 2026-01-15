@@ -63,6 +63,39 @@ export const getLatestProducts = async (limit = 6): Promise<Product[]> => {
     }
 };
 
+export const getFlashSaleProducts = async (limit = 4): Promise<Product[]> => {
+    try {
+        const response = await httpAxios.get(ENDPOINTS.flashSale, {
+            params: { limit }
+        });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Không thể lấy sản phẩm Flash Sale");
+    }
+};
+
+export const getMegaSaleProducts = async (limit = 4): Promise<Product[]> => {
+    try {
+        const response = await httpAxios.get(ENDPOINTS.megaSale, {
+            params: { limit }
+        });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Không thể lấy sản phẩm Mega Sale");
+    }
+};
+
+export const getBestSellingProducts = async (limit = 8): Promise<Product[]> => {
+    try {
+        const response = await httpAxios.get(ENDPOINTS.bestSelling, {
+            params: { limit }
+        });
+        return response.data;
+    } catch (error: any) {
+        throw new Error(error.response?.data?.message || "Không thể lấy sản phẩm bán chạy");
+    }
+};
+
 export const searchProducts = async (keyword: string, page = 0, size = 12): Promise<PaginatedResponse<Product>> => {
     try {
         const response = await httpAxios.get(`${ENDPOINTS.products}/search`, {
@@ -89,6 +122,7 @@ export const filterProducts = async (params: {
     status?: number;
     minPrice?: number;
     maxPrice?: number;
+    keyword?: string;
     hasPromotion?: boolean;
     sortBy?: string;
     page?: number;

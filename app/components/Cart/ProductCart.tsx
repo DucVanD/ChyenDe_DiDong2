@@ -2,19 +2,23 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { CartItem } from "@/services/cart.service";
-import { showAlert, showConfirm } from "@/utils/alert";
+import { showConfirm } from "@/utils/alert";
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
+import { showToast } from "../common/Toast";
 
 interface ProductCartProps {
   cartItems: CartItem[];
+  selectedItems: Set<string>;
+  onToggleItem: (itemKey: string) => void;
   onUpdate: () => void;
   onOptimisticUpdate?: (items: CartItem[]) => void;
 }
 
-export default function ProductCart({ cartItems, onUpdate, onOptimisticUpdate }: ProductCartProps) {
+export default function ProductCart({ cartItems, selectedItems, onToggleItem, onUpdate, onOptimisticUpdate }: ProductCartProps) {
 
   const handleUpdateQuantity = async (item: CartItem, newQty: number) => {
     if (newQty < 1) {
-      showAlert('Thông báo', 'Số lượng phải lớn hơn 0');
+      showToast({ message: 'Số lượng phải lớn hơn 0', type: 'warning' });
       return;
     }
 
@@ -33,11 +37,9 @@ export default function ProductCart({ cartItems, onUpdate, onOptimisticUpdate }:
     const result = await updateQuantity(item.id, newQty, item.selectedSize);
 
     if (!result.success) {
-      showAlert('Thông báo', result.message);
-      // Reload to revert optimistic update on error
+      showToast({ message: result.message, type: 'error' });
       onUpdate();
     } else {
-      // Sync with storage (optional, already updated optimistically)
       onUpdate();
     }
   };
@@ -59,10 +61,11 @@ export default function ProductCart({ cartItems, onUpdate, onOptimisticUpdate }:
 
         const result = await removeFromCart(item.id, item.selectedSize);
         if (result.success) {
-          onUpdate(); // Sync with storage
+          showToast({ message: 'Đã xóa sản phẩm', type: 'success' });
+          onUpdate();
         } else {
-          showAlert('Lỗi', result.message);
-          onUpdate(); // Reload to revert
+          showToast({ message: result.message, type: 'error' });
+          onUpdate();
         }
       }
     );
@@ -72,9 +75,23 @@ export default function ProductCart({ cartItems, onUpdate, onOptimisticUpdate }:
     <View style={styles.listContainer}>
       {cartItems.map((item) => {
         const displayPrice = item.discountPrice || item.salePrice || 0;
+        const itemKey = `${item.id}-${item.selectedSize || 'default'}`;
+        const isSelected = selectedItems.has(itemKey);
 
         return (
-          <View key={`${item.id}-${item.selectedSize || 'default'}`} style={styles.cartItem}>
+          <View key={itemKey} style={styles.cartItem}>
+            {/* Checkbox */}
+            <TouchableOpacity
+              onPress={() => onToggleItem(itemKey)}
+              style={styles.checkboxContainer}
+            >
+              <Ionicons
+                name={isSelected ? "checkmark-circle" : "ellipse-outline"}
+                size={22}
+                color={isSelected ? Colors.primary.main : Colors.neutral.border}
+              />
+            </TouchableOpacity>
+
             {/* Image */}
             <Image
               source={typeof item.image === 'string' ? { uri: item.image } : item.image}
@@ -94,7 +111,7 @@ export default function ProductCart({ cartItems, onUpdate, onOptimisticUpdate }:
                     style={styles.iconButton}
                     onPress={() => handleDelete(item)}
                   >
-                    <Ionicons name="trash-outline" size={20} color="#9098B1" />
+                    <Ionicons name="trash-outline" size={18} color={Colors.neutral.text.tertiary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -110,7 +127,7 @@ export default function ProductCart({ cartItems, onUpdate, onOptimisticUpdate }:
                     style={styles.qtyBtn}
                     onPress={() => handleUpdateQuantity(item, item.quantity - 1)}
                   >
-                    <Ionicons name="remove" size={16} color="#9098B1" />
+                    <Ionicons name="remove" size={14} color={Colors.neutral.text.secondary} />
                   </TouchableOpacity>
 
                   <View style={styles.qtyValue}>
@@ -121,7 +138,7 @@ export default function ProductCart({ cartItems, onUpdate, onOptimisticUpdate }:
                     style={styles.qtyBtn}
                     onPress={() => handleUpdateQuantity(item, item.quantity + 1)}
                   >
-                    <Ionicons name="add" size={16} color="#9098B1" />
+                    <Ionicons name="add" size={14} color={Colors.neutral.text.secondary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -135,41 +152,48 @@ export default function ProductCart({ cartItems, onUpdate, onOptimisticUpdate }:
 
 const styles = StyleSheet.create({
   listContainer: {
-    marginTop: 16,
+    marginTop: Spacing.md,
   },
 
   cartItem: {
     flexDirection: "row",
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#EBF0FF",
-    borderRadius: 5,
-    marginBottom: 16,
-    backgroundColor: "#fff",
+    padding: Spacing.md,
+    backgroundColor: Colors.neutral.white,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.base,
+    ...Shadows.md,
+  },
+
+  checkboxContainer: {
+    marginRight: Spacing.sm,
+    justifyContent: 'center',
   },
 
   productImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 5,
-    marginRight: 12,
+    width: 80,
+    height: 80,
+    borderRadius: BorderRadius.md,
+    marginRight: Spacing.md,
+    backgroundColor: Colors.neutral.bg,
   },
 
   productInfo: {
     flex: 1,
+    justifyContent: "space-between",
   },
 
   rowTop: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
   },
 
   productName: {
     flex: 1,
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#223263",
-    marginRight: 8,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.neutral.text.primary,
+    marginRight: 4,
   },
 
   actionIcons: {
@@ -177,45 +201,48 @@ const styles = StyleSheet.create({
   },
 
   iconButton: {
-    marginLeft: 8,
+    padding: 4,
   },
 
   rowBottom: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 8,
   },
 
   productPrice: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#40BFFF",
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary.main,
   },
 
   quantityContainer: {
     flexDirection: "row",
-    borderWidth: 1,
-    borderColor: "#EBF0FF",
-    borderRadius: 5,
-    height: 24,
+    alignItems: "center",
+    backgroundColor: Colors.neutral.bg,
+    borderRadius: BorderRadius.full,
+    padding: 2,
   },
 
   qtyBtn: {
-    width: 32,
+    width: 28,
+    height: 28,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: Colors.neutral.white,
+    borderRadius: 14,
   },
 
   qtyValue: {
-    width: 40,
+    paddingHorizontal: Spacing.md,
+    minWidth: 40,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F6F7F8",
   },
 
   qtyText: {
-    fontSize: 12,
-    color: "#223263",
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
   },
 });

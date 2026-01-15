@@ -13,30 +13,40 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import FadeInStagger from "@/app/components/common/FadeInStagger";
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
+import * as Haptics from 'expo-haptics';
 
-// Component hiển thị một item danh mục
-const CategoryItem = ({ item }: { item: Category }) => {
+
+// Component hiển thị một item danh mục theo hàng (List Item)
+const CategoryItem = ({ item, index }: { item: Category, index: number }) => {
   const router = useRouter();
 
   return (
-    <TouchableOpacity
-      style={styles.categoryItem}
-      onPress={() => router.push({
-        pathname: "/searchProduct",
-        params: { categoryId: item.id }
-      })}
-    >
-      <View style={styles.categoryIconCircle}>
-        {item.image ? (
-          <Image source={{ uri: item.image }} style={{ width: 40, height: 40 }} />
-        ) : (
-          <Ionicons name="apps-outline" size={24} color="#40BFFF" />
-        )}
-      </View>
-      <Text style={styles.categoryLabel}>{item.name}</Text>
-    </TouchableOpacity>
+    <FadeInStagger index={index % 15}>
+      <TouchableOpacity
+        style={styles.categoryItem}
+        activeOpacity={0.7}
+        onPress={() => router.push({
+          pathname: "/products",
+          params: { categoryId: item.id }
+        })}
+      >
+        <View style={styles.itemMain}>
+          <View style={styles.categoryIconCircle}>
+            {item.image ? (
+              <Image source={{ uri: item.image }} style={styles.iconImage} />
+            ) : (
+              <Ionicons name="apps-outline" size={24} color={Colors.primary.main} />
+            )}
+          </View>
+          <Text style={styles.categoryLabel}>{item.name}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={Colors.neutral.text.tertiary} />
+      </TouchableOpacity>
+    </FadeInStagger>
   );
 };
 
@@ -61,29 +71,47 @@ export default function ExploreScreen() {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color="#40BFFF" style={styles.searchIcon} />
+      <View style={styles.searchBox}>
+        <Ionicons name="search-outline" size={20} color={Colors.neutral.text.tertiary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Tìm kiếm sản phẩm"
-          placeholderTextColor="#9098B1"
+          placeholder="Tìm kiếm sản phẩm..."
+          placeholderTextColor={Colors.neutral.text.tertiary}
           returnKeyType="search"
           onSubmitEditing={(event) => {
             router.push({
-              pathname: "/searchProduct",
+              pathname: "/products",
               params: { q: event.nativeEvent.text }
             });
           }}
         />
       </View>
-      <TouchableOpacity style={styles.iconButton}>
-        <Ionicons name="heart-outline" size={24} color="#9098B1" />
+
+      <TouchableOpacity
+        style={[styles.iconButton, styles.aiButton]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          router.push("/chat");
+        }}
+      >
+        <MaterialCommunityIcons name="robot" size={20} color={Colors.primary.main} />
       </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.iconButton}
-        onPress={() => router.push("/notifications")}
+        onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
       >
-        <Ionicons name="notifications-outline" size={24} color="#9098B1" />
+        <Ionicons name="heart-outline" size={22} color={Colors.neutral.text.primary} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.iconButton}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push("/notifications");
+        }}
+      >
+        <Ionicons name="notifications-outline" size={22} color={Colors.neutral.text.primary} />
         <View style={styles.badge} />
       </TouchableOpacity>
     </View>
@@ -93,8 +121,8 @@ export default function ExploreScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#40BFFF" />
-          <Text style={{ marginTop: 10, color: '#9098B1' }}>Đang tải danh mục...</Text>
+          <ActivityIndicator size="large" color={Colors.primary.main} />
+          <Text style={{ marginTop: 10, color: Colors.neutral.text.secondary }}>Đang tải danh mục...</Text>
         </View>
       </SafeAreaView>
     );
@@ -107,7 +135,11 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       {renderHeader()}
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }} // Space for AI Bot
+      >
         {parentCategories.map(parent => {
           const children = childCategories.filter(child => child.parentId === parent.id);
 
@@ -115,10 +147,13 @@ export default function ExploreScreen() {
 
           return (
             <View key={parent.id} style={styles.section}>
-              <Text style={styles.sectionTitle}>{parent.name}</Text>
-              <View style={styles.categoriesGrid}>
-                {children.map((item) => (
-                  <CategoryItem key={item.id} item={item} />
+              <View style={styles.sectionHeader}>
+                <Ionicons name="folder-open-outline" size={20} color={Colors.primary.main} style={{ marginRight: 8 }} />
+                <Text style={styles.sectionTitle}>{parent.name}</Text>
+              </View>
+              <View style={styles.categoriesList}>
+                {children.map((item, index) => (
+                  <CategoryItem key={item.id} item={item} index={index} />
                 ))}
               </View>
             </View>
@@ -132,94 +167,120 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.neutral.white,
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.neutral.white,
   },
   // --- Header Styles ---
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: Spacing.base,
+    minHeight: 68,
+    gap: Spacing.md,
+    backgroundColor: Colors.neutral.white,
     borderBottomWidth: 1,
-    borderBottomColor: "#EBF0FF",
+    borderBottomColor: Colors.neutral.border,
   },
-  searchContainer: {
+  searchBox: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    borderColor: "#EBF0FF",
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 12,
-    height: 46,
-    marginRight: 16,
-  },
-  searchIcon: {
-    marginRight: 8,
+    backgroundColor: Colors.neutral.bg,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    height: 44,
+    gap: Spacing.sm,
   },
   searchInput: {
     flex: 1,
-    fontSize: 12,
-    color: "#223263",
+    fontSize: Typography.fontSize.base,
+    color: Colors.neutral.text.primary,
   },
   iconButton: {
-    padding: 4,
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.neutral.bg,
+    justifyContent: "center",
+    alignItems: "center",
     position: "relative",
+  },
+  aiButton: {
+    backgroundColor: Colors.primary.light,
+    borderWidth: 1,
+    borderColor: Colors.primary.main,
   },
   badge: {
     position: "absolute",
-    top: 0,
-    right: 0,
+    top: 8,
+    right: 8,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#FB7181",
-    borderWidth: 1,
-    borderColor: "#fff",
+    backgroundColor: Colors.accent.error,
   },
 
   // --- Section & Category Styles ---
   section: {
-    paddingHorizontal: 16,
-    marginTop: 16,
+    paddingBottom: Spacing.lg,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.base,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#223263",
-    marginBottom: 16,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  categoriesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-start", // Căn trái để các item không bị giãn quá mức
-    marginHorizontal: -8, // Offset margin của item để căn lề
+  categoriesList: {
+    backgroundColor: Colors.neutral.white,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.neutral.border,
   },
   categoryItem: {
-    width: "25%", // Mỗi hàng 4 item
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
-    paddingHorizontal: 8, // Tạo khoảng cách giữa các item
+    justifyContent: "space-between",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.base,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral.bg, // Divider internal
+  },
+  itemMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   categoryIconCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderWidth: 1,
-    borderColor: "#EBF0FF",
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary.light,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    marginRight: Spacing.base,
+    ...Shadows.sm,
+  },
+  iconImage: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
   },
   categoryLabel: {
-    fontSize: 10,
-    color: "#9098B1",
-    textAlign: "center",
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.neutral.text.primary,
+    flex: 1,
   },
 });

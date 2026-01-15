@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import FadeInStagger from "../common/FadeInStagger";
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
 
 import { Category } from "@/services/category.service";
 
@@ -32,15 +33,15 @@ export default function ProductCategory({ categories }: Props) {
             <TouchableOpacity
               style={styles.categoryItem}
               onPress={() => router.push({
-                pathname: "/searchProduct",
+                pathname: "/products",
                 params: { categoryId: cat.id }
               })}
             >
               <View style={styles.categoryIconCircle}>
                 {cat.image ? (
-                  <Image source={{ uri: cat.image }} style={{ width: 30, height: 30 }} />
+                  <Image source={{ uri: cat.image }} style={{ width: 44, height: 44 }} />
                 ) : (
-                  <Ionicons name="apps-outline" size={24} color="#40BFFF" />
+                  <Ionicons name="apps-outline" size={32} color={Colors.primary.main} />
                 )}
               </View>
               <Text style={styles.categoryText} numberOfLines={1}>{cat.name}</Text>
@@ -75,13 +76,14 @@ const styles = StyleSheet.create({
   },
 
   categoryIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#F2F8FF",
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: Colors.primary.light,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 8,
+    ...Shadows.sm,
   },
 
   categoryText: {

@@ -1,23 +1,33 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, Platform, StatusBar } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, Pressable, ScrollView, SafeAreaView, Platform, StatusBar, Image, TextInput, TouchableOpacity, ActivityIndicator, Alert, Clipboard } from "react-native";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as Haptics from 'expo-haptics';
 import FadeInStagger from "@/app/components/common/FadeInStagger";
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
+import { getStoredUser, UserInfo } from "@/services/auth.service";
+
 
 export default function Profile() {
   const router = useRouter();
+  const [user, setUser] = useState<UserInfo | null>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const storedUser = await getStoredUser();
+      setUser(storedUser);
+    };
+    loadUser();
+  }, []);
 
   const handleLogout = () => {
-    console.log("User logged out");
-    // Thêm "as any" để bỏ qua lỗi kiểm tra file login chưa tồn tại
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.replace("/login" as any);
   };
 
-  // Thêm ": any" vào đây để tắt lỗi kiểm tra kiểu dữ liệu của props
   const MenuItem = ({ iconName, label, onPress, isLogout = false }: any) => {
-    const color = isLogout ? "#FB7181" : "#40BFFF";
-    const textColor = isLogout ? "#FB7181" : "#223263";
+    const iconColor = isLogout ? Colors.accent.error : Colors.primary.main;
+    const textColor = isLogout ? Colors.accent.error : Colors.neutral.text.primary;
 
     return (
       <Pressable
@@ -27,12 +37,14 @@ export default function Profile() {
         }}
         style={({ pressed }) => [
           styles.menuItem,
-          { backgroundColor: pressed ? "#EBF0FF" : "#fff" }
+          pressed && styles.menuItemPressed
         ]}
       >
-        {/* iconName cũng được ép kiểu để không báo lỗi nếu tên icon sai */}
-        <Ionicons name={iconName} size={24} color={color} />
+        <View style={styles.menuIconContainer}>
+          <Ionicons name={iconName} size={22} color={iconColor} />
+        </View>
         <Text style={[styles.menuText, { color: textColor }]}>{label}</Text>
+        <Ionicons name="chevron-forward" size={20} color={Colors.neutral.text.tertiary} />
       </Pressable>
     );
   };
@@ -45,12 +57,29 @@ export default function Profile() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* USER PROFILE SUMMARY */}
+        <FadeInStagger index={0}>
+          <Pressable
+            style={styles.profileSection}
+            onPress={() => router.push("/profile" as any)}
+          >
+            <Image
+              source={user?.avatar ? { uri: user.avatar } : require('@/assets/images/avatar.jpg')}
+              style={styles.avatar}
+            />
+            <View style={styles.profileInfo}>
+              <Text style={styles.userName}>{user?.name || "Người dùng"}</Text>
+              <Text style={styles.userEmail}>{user?.email || "Chưa đăng nhập"}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.neutral.text.tertiary} />
+          </Pressable>
+        </FadeInStagger>
 
         {/* 1. PROFILE */}
-        <FadeInStagger index={0}>
+        <FadeInStagger index={1}>
           <MenuItem
             iconName="person-outline"
-            label="Hồ sơ"
+            label="Hồ sơ cá nhân"
             onPress={() => router.push("/profile" as any)}
           />
         </FadeInStagger>
@@ -103,49 +132,90 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.neutral.bg,
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
   // Header
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: Spacing.base,
+    minHeight: 68,
+    backgroundColor: Colors.neutral.white,
     borderBottomWidth: 1,
-    borderBottomColor: "#EBF0FF",
-    backgroundColor: "#fff",
+    borderBottomColor: Colors.neutral.border,
+    justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#223263",
+    fontSize: Typography.fontSize["2xl"],
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
   },
 
   // Content
   content: {
-    paddingTop: 0,
+    paddingBottom: Spacing["2xl"],
+  },
+
+  // Profile Section
+  profileSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.neutral.white,
+    padding: Spacing.base,
+    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.neutral.bg,
+  },
+  profileInfo: {
+    flex: 1,
+    marginLeft: Spacing.base,
+  },
+  userName: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+  },
+  userEmail: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
+    marginTop: 2,
   },
 
   // Menu Item
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: Spacing.base,
+    paddingHorizontal: Spacing.base,
+    backgroundColor: Colors.neutral.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral.bg,
   },
-
+  menuItemPressed: {
+    backgroundColor: Colors.neutral.bg,
+  },
+  menuIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary.light,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   menuText: {
     flex: 1,
-    marginLeft: 16,
-    fontSize: 14,
-    fontWeight: "700",
+    marginLeft: Spacing.base,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
 
   // Separator
   separator: {
-    height: 1,
-    backgroundColor: "#EBF0FF",
-    marginVertical: 10,
-    marginHorizontal: 16,
+    height: Spacing.md,
   }
 });

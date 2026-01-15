@@ -10,7 +10,7 @@ import { Platform } from "react-native";
 // Tự động chọn URL phù hợp với platform
 // Web: dùng localhost
 // Mobile: dùng IP máy chạy backend (thay đổi IP này nếu cần)
-const IP_ADDRESS = "10.223.114.230"; // IP backend ADMIN_DiDong/demo
+const IP_ADDRESS = "10.0.0.177"; // IP backend ADMIN_DiDong/demo
 const PORT = "8080";
 
 export const API_BASE_URL =
@@ -26,9 +26,15 @@ export const ENDPOINTS = {
     register: `${API_BASE_URL}/auth/register`,
     login: `${API_BASE_URL}/auth/login`,
     me: `${API_BASE_URL}/auth/me`,
+    forgotPassword: `${API_BASE_URL}/auth/forgot-password`,
+    verifyCode: `${API_BASE_URL}/auth/verify-code`,
+    resetPassword: `${API_BASE_URL}/auth/reset-password`,
 
     // Products
     products: `${API_BASE_URL}/products`,
+    flashSale: `${API_BASE_URL}/products/flash-sale`,
+    megaSale: `${API_BASE_URL}/products/mega-sale`,
+    bestSelling: `${API_BASE_URL}/products/best-selling`,
 
     // Categories
     categories: `${API_BASE_URL}/categories`,
@@ -41,6 +47,9 @@ export const ENDPOINTS = {
 
     // Vouchers
     vouchers: `${API_BASE_URL}/vouchers`,
+
+    // Payments
+    payments: `${API_BASE_URL}/payments`,
 
     // Users
     users: `${API_BASE_URL}/users`,

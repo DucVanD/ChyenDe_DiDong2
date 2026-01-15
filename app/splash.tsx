@@ -2,6 +2,8 @@ import { Image, StyleSheet, View, ActivityIndicator, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { getToken } from "@/services/auth.service";
+import { LinearGradient } from "expo-linear-gradient";
+import { Colors, Shadows, BorderRadius, Typography } from "@/constants/theme";
 
 export default function Splash() {
   const router = useRouter();
@@ -33,23 +35,25 @@ export default function Splash() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={[Colors.primary.main, Colors.primary.dark]}
+      style={styles.container}
+    >
       <View style={styles.logoContainer}>
         <Image
           source={require("../assets/images/logo.png")}
           style={styles.logo}
         />
       </View>
-      <ActivityIndicator size="large" color="#fff" style={{ marginTop: 20 }} />
+      <ActivityIndicator size="large" color={Colors.neutral.white} style={{ marginTop: 20 }} />
       <Text style={styles.loadingText}>Đang kiểm tra...</Text>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#47B5FF",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -57,36 +61,24 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: 140,
     height: 140,
-    backgroundColor: "#fff",
-    borderRadius: 24,
+    backgroundColor: Colors.neutral.white,
+    borderRadius: BorderRadius.xl,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 24,
-    elevation: 6, // Android shadow
+    ...Shadows.lg,
   },
 
   logo: {
-    width: 120,
-    height: 120,
-    // resizeMode: "contain",
-    // tintColor: "#47B5FF",
-  },
-
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 6,
-  },
-
-  subtitle: {
-    fontSize: 14,
-    color: "#EAF6FF",
+    width: 100,
+    height: 100,
+    resizeMode: "contain",
   },
 
   loadingText: {
-    color: "#fff",
+    color: Colors.neutral.white,
     marginTop: 10,
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
   },
 });

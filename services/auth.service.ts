@@ -219,3 +219,102 @@ export const isLoggedIn = async (): Promise<boolean> => {
     const token = await getToken();
     return token !== null;
 };
+/**
+ * Gửi mã OTP quên mật khẩu
+ */
+export const forgotPassword = async (email: string): Promise<any> => {
+    try {
+        const response = await fetch(ENDPOINTS.forgotPassword, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || "Không thể gửi mã OTP");
+        }
+        return data;
+    } catch (error: any) {
+        throw handleFetchError(error, "Không thể gửi mã OTP");
+    }
+};
+
+/**
+ * Xác thực mã OTP
+ */
+export const verifyCode = async (email: string, code: string): Promise<any> => {
+    try {
+        const response = await fetch(ENDPOINTS.verifyCode, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email, code }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || "Mã xác thực không đúng");
+        }
+        return data;
+    } catch (error: any) {
+        throw handleFetchError(error, "Xác thực mã thất bại");
+    }
+};
+
+/**
+ * Reset mật khẩu mới
+ */
+export const resetPassword = async (email: string, code: string, newPassword: string): Promise<any> => {
+    try {
+        const response = await fetch(ENDPOINTS.resetPassword, {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email, code, newPassword }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || "Đổi mật khẩu thất bại");
+        }
+        return data;
+    } catch (error: any) {
+        throw handleFetchError(error, "Đổi mật khẩu thất bại");
+    }
+};
+
+/**
+ * Đổi mật khẩu (khi đã đăng nhập)
+ */
+export const changePassword = async (userId: number, currentPassword: string, newPassword: string): Promise<any> => {
+    const token = await getToken();
+    if (!token) throw new Error("Chưa đăng nhập");
+
+    try {
+        const response = await fetch(`${ENDPOINTS.users}/${userId}/change-password`, {
+            method: "PUT",
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ currentPassword, newPassword }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || "Đổi mật khẩu thất bại");
+        }
+        return data;
+    } catch (error: any) {
+        throw handleFetchError(error, "Đổi mật khẩu thất bại");
+    }
+};

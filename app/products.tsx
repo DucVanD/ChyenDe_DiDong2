@@ -1,8 +1,9 @@
-// app/product/index.tsx
+import { getCategories } from "@/services/category.service";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useRouter } from "expo-router";
-import React, { useState } from "react";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
@@ -14,94 +15,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
 } from "react-native";
-
-/* =======================
-   DATA & TYPES
-======================= */
-type Product = {
-  id: number;
-  name: string;
-  price: string;
-  originalPrice?: string;
-  rating: number;
-  reviews: number;
-  image: string;
-};
-
-const PRODUCTS: Product[] = [
-  {
-    id: 1,
-    name: "Nike Air Max 270 React ENG",
-    price: "$299.43",
-    originalPrice: "$534.33",
-    rating: 4.5,
-    reviews: 90,
-    image: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&w=500&q=60",
-  },
-  {
-    id: 2,
-    name: "Adidas Ultraboost DNA Running",
-    price: "$199.00",
-    rating: 4.8,
-    reviews: 120,
-    image: "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&w=500&q=60",
-  },
-  {
-    id: 3,
-    name: "Puma RS-X³ Puzzle",
-    price: "$150.50",
-    originalPrice: "$220.00",
-    rating: 4.2,
-    reviews: 45,
-    image: "https://images.unsplash.com/photo-1608667508764-33cf0726b13a?auto=format&fit=crop&w=500&q=60",
-  },
-  {
-    id: 4,
-    name: "New Balance 574 Core",
-    price: "$89.99",
-    rating: 4.0,
-    reviews: 210,
-    image: "https://images.unsplash.com/photo-1539185441755-769473a23570?auto=format&fit=crop&w=500&q=60",
-  },
-  {
-    id: 5,
-    name: "Converse Chuck Taylor All Star High Top",
-    price: "$65.00",
-    originalPrice: "$80.00",
-    rating: 4.7,
-    reviews: 330,
-    image: "https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=500&q=60",
-  },
-  {
-    id: 6,
-    name: "Converse Chuck Taylor All Star High Top",
-    price: "$65.00",
-    originalPrice: "$80.00",
-    rating: 4.7,
-    reviews: 330,
-    image: "https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=500&q=60",
-  },
-  {
-    id: 7,
-    name: "Converse Chuck Taylor All Star High Top",
-    price: "$65.00",
-    originalPrice: "$80.00",
-    rating: 4.7,
-    reviews: 330,
-    image: "https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=500&q=60",
-  },
-  {
-    id: 8,
-    name: "Converse Chuck Taylor All Star High Top",
-    price: "$65.00",
-    originalPrice: "$80.00",
-    rating: 4.7,
-    reviews: 330,
-    image: "https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=500&q=60",
-  },
-];
-
+import { filterProducts, Product, searchProducts } from "@/services/product.service";
+import Skeleton from "@/app/components/common/Skeleton";
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
+import { Button } from "@/app/components/common/Button";
+import * as Haptics from 'expo-haptics';
+import DiscountBadge from "@/app/components/common/DiscountBadge";
+import FadeInStagger from "@/app/components/common/FadeInStagger";
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width / 2 - 24;
 
@@ -110,117 +32,256 @@ const CARD_WIDTH = width / 2 - 24;
 ======================= */
 export default function ProductList() {
   const router = useRouter();
-  const [searchText, setSearchText] = useState("");
+  const params = useLocalSearchParams();
 
-  // State quản lý hiển thị Modal Filter
+  const initialQuery = params.q?.toString() || "";
+  const categoryId = params.categoryId ? Number(params.categoryId) : null;
+
+  const [searchText, setSearchText] = useState(initialQuery);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  // Modal Filter State
   const [modalVisible, setModalVisible] = useState(false);
+  const [categoryName, setCategoryName] = useState<string | null>(null);
 
-  // Logic tìm kiếm theo tên
-  const filteredProducts = PRODUCTS.filter((product) =>
-    product.name.toLowerCase().includes(searchText.toLowerCase())
-  );
+  // Filter params
+  const [selectedPriceRange, setSelectedPriceRange] = useState<number | null>(null);
+  const [selectedSort, setSelectedSort] = useState<string>("newest");
+
+  const PRICE_RANGES = [
+    { label: "Dưới 500k", min: 0, max: 500000 },
+    { label: "Dưới 2tr", min: 0, max: 2000000 },
+    { label: "2tr - 5tr", min: 2000000, max: 5000000 },
+    { label: "Trên 5tr", min: 5000000, max: 100000000 },
+  ];
+
+  const SORT_OPTIONS = [
+    { label: "Mới nhất", value: "newest" },
+    { label: "Giá: Thấp - Cao", value: "price_asc" },
+    { label: "Giá: Cao - Thấp", value: "price_desc" },
+  ];
+
+  const fetchProducts = useCallback(async (pageNum: number, isNewSearch = false) => {
+    try {
+      if (isNewSearch) setLoading(true);
+      else setLoadingMore(true);
+
+      let response;
+      const filterParams: any = {
+        page: pageNum,
+        size: 10,
+        sortBy: selectedSort,
+        keyword: searchText
+      };
+
+      if (selectedPriceRange !== null) {
+        filterParams.minPrice = PRICE_RANGES[selectedPriceRange].min;
+        filterParams.maxPrice = PRICE_RANGES[selectedPriceRange].max;
+      }
+
+      if (categoryId) {
+        filterParams.categoryId = [categoryId];
+      }
+
+      response = await filterProducts(filterParams);
+
+      if (isNewSearch) {
+        setProducts(response.content);
+      } else {
+        setProducts(prev => [...prev, ...response.content]);
+      }
+
+      setTotalPages(response.totalPages);
+    } catch (error) {
+      console.error("Lỗi khi tải sản phẩm:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [searchText, categoryId, selectedSort, selectedPriceRange]);
+
+  useEffect(() => {
+    const fetchCategoryInfo = async () => {
+      if (categoryId) {
+        try {
+          const cats = await getCategories();
+          const currentCat = cats.find(c => c.id === categoryId);
+          if (currentCat) setCategoryName(currentCat.name);
+        } catch (error) {
+          console.error("Lỗi khi lấy thông tin danh mục:", error);
+        }
+      } else {
+        setCategoryName(null);
+      }
+    };
+
+    fetchCategoryInfo();
+    setPage(0);
+    fetchProducts(0, true);
+  }, [initialQuery, categoryId, selectedSort, selectedPriceRange]); // Refetch when sort or price range changes
+
+  const handleLoadMore = () => {
+    if (!loading && !loadingMore && page < totalPages - 1) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchProducts(nextPage);
+    }
+  };
 
   // Render từng sản phẩm
-  const renderProductItem = ({ item }: { item: Product }) => (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.8}
-      // ...existing code...
-      onPress={() =>
-        router.push({ pathname: "/detail", params: { id: item.id.toString() } })
-      }
-    // ...existing code...
-    >
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: item.image }} style={styles.cardImage} />
-      </View>
-
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {item.name}
-        </Text>
-
-        <View style={styles.ratingContainer}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Ionicons
-              key={star}
-              name={star <= Math.round(item.rating) ? "star" : "star-outline"}
-              size={12}
-              color="#FFC107"
+  const renderProductItem = ({ item, index }: { item: Product, index: number }) => (
+    <FadeInStagger index={index % 10} style={{ width: '48%' }}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+        onPress={() => {
+          Haptics.selectionAsync();
+          router.push({ pathname: "/detail", params: { id: item.id.toString() } });
+        }}
+      >
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: item.image }} style={styles.cardImage} />
+          {item.discountPrice && item.discountPrice < item.salePrice && (
+            <DiscountBadge
+              discount={(1 - item.discountPrice / item.salePrice) * 100}
             />
-          ))}
-        </View>
-
-        <View style={styles.priceContainer}>
-          <Text style={styles.currentPrice}>{item.price}</Text>
-          {item.originalPrice && (
-            <Text style={styles.originalPrice}>{item.originalPrice}</Text>
           )}
         </View>
-        <View style={styles.reviewsWrapper}>
-          <Text style={styles.reviewText}>{item.reviews} Reviews</Text>
+
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.name}
+          </Text>
+
+          <View style={styles.ratingContainer}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Ionicons
+                key={star}
+                name={star <= 4 ? "star" : "star-outline"}
+                size={12}
+                color="#FFC107"
+              />
+            ))}
+          </View>
+
+          <View style={styles.priceContainer}>
+            <Text style={styles.currentPrice}>
+              {item.discountPrice ? item.discountPrice.toLocaleString('vi-VN') : item.salePrice.toLocaleString('vi-VN')}đ
+            </Text>
+            <View style={styles.priceRow}>
+              {item.discountPrice && (
+                <Text style={styles.originalPrice}>{item.salePrice.toLocaleString('vi-VN')}đ</Text>
+              )}
+            </View>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </FadeInStagger>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
-          headerTitle: "Daily Products",
+          headerTitle: "Sản phẩm",
           headerShadowVisible: false,
           headerTitleStyle: styles.headerTitleText,
-          headerStyle: { backgroundColor: "#fff" },
+          headerStyle: { backgroundColor: Colors.neutral.white },
+          headerTintColor: Colors.neutral.text.primary,
         }}
       />
 
       {/* --- THANH CÔNG CỤ (SEARCH & FILTER) --- */}
       <View style={styles.toolsContainer}>
         <View style={styles.searchWrapper}>
-          <Ionicons name="search-outline" size={20} color="#40BFFF" />
+          <Ionicons name="search-outline" size={20} color={Colors.neutral.text.tertiary} />
           <TextInput
-            placeholder="Search Product"
-            placeholderTextColor="#9098B1"
+            placeholder="Bạn đang tìm gì?"
+            placeholderTextColor={Colors.neutral.text.tertiary}
             style={styles.searchInput}
             value={searchText}
             onChangeText={setSearchText}
+            onSubmitEditing={() => fetchProducts(0, true)}
           />
         </View>
-        {/* Nút mở Filter Modal */}
         <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => setModalVisible(true)}
+          style={styles.filterBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setModalVisible(true);
+          }}
         >
-          <Ionicons name="filter-outline" size={24} color="#40BFFF" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="funnel-outline" size={24} color="#9098B1" />
+          <Ionicons name="options-outline" size={20} color={Colors.neutral.text.secondary} />
         </TouchableOpacity>
       </View>
 
       {/* --- TIÊU ĐỀ SECTION --- */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>List Product</Text>
-        <Text style={styles.resultCount}>{filteredProducts.length} items</Text>
+        <Text style={styles.sectionTitle}>
+          {categoryName ? `Danh mục: ${categoryName}` : (searchText ? `Kết quả cho "${searchText}"` : "Tất cả sản phẩm")}
+        </Text>
+        <Text style={styles.resultCount}>
+          {products.length} sản phẩm
+        </Text>
       </View>
 
-      {/* --- DANH SÁCH SẢN PHẨM --- */}
-      <FlatList
-        data={filteredProducts}
-        numColumns={2}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderProductItem}
-        contentContainerStyle={styles.listContainer}
-        columnWrapperStyle={styles.columnWrapper}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search" size={50} color="#EBF0FF" />
-            <Text style={styles.emptyText}>Product Not Found</Text>
+      {loading ? (
+        <View style={{ flex: 1, padding: Spacing.base }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <View key={i} style={[styles.card, { width: '48%' }]}>
+                <Skeleton width="100%" height={140} borderRadius={BorderRadius.lg} />
+                <View style={{ padding: Spacing.sm }}>
+                  <Skeleton width="100%" height={15} />
+                  <Skeleton width="60%" height={15} style={{ marginTop: 8 }} />
+                </View>
+              </View>
+            ))}
           </View>
-        }
-      />
+        </View>
+      ) : (
+        <FlatList
+          data={products}
+          numColumns={2}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderProductItem}
+          contentContainerStyle={styles.listContainer}
+          columnWrapperStyle={styles.columnWrapper}
+          showsVerticalScrollIndicator={false}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator size="small" color={Colors.primary.main} style={{ marginVertical: Spacing.xl }} />
+            ) : <View style={{ height: Spacing.xl }} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="search-outline" size={64} color={Colors.neutral.text.tertiary} />
+              </View>
+              <Text style={styles.emptyTitle}>Không tìm thấy sản phẩm</Text>
+              <Text style={styles.emptyText}>Thử thay đổi từ khóa hoặc bộ lọc của bạn để có kết quả tốt hơn</Text>
+              <View style={{ marginTop: Spacing.xl, width: 200 }}>
+                <Button
+                  title="Xóa tất cả bộ lọc"
+                  variant="outline"
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setSelectedPriceRange(null);
+                    setSelectedSort("newest");
+                  }}
+                  fullWidth
+                />
+              </View>
+            </View>
+          }
+        />
+      )}
 
       {/* --- MODAL FILTER (Lấy từ code mẫu của bạn) --- */}
       <Modal
@@ -232,64 +293,76 @@ export default function ProductList() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
 
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter Search</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#223263" />
-              </TouchableOpacity>
+              <View style={styles.modalHandle} />
+              <View style={styles.modalHeaderContent}>
+                <Text style={styles.modalTitle}>Bộ lọc sản phẩm</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                  <Ionicons name="close" size={22} color={Colors.neutral.text.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
 
+              {/* Filter: Sort By */}
+              <Text style={styles.filterSectionTitle}>Sắp xếp theo</Text>
+              <View style={styles.chipContainer}>
+                {SORT_OPTIONS.map((option, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.chip, selectedSort === option.value && styles.chipActive]}
+                    onPress={() => setSelectedSort(option.value)}
+                  >
+                    <Text style={[styles.chipText, selectedSort === option.value && styles.chipTextActive]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               {/* Filter: Price Range */}
-              <Text style={styles.filterSectionTitle}>Price Range</Text>
-              <View style={styles.priceInputs}>
-                <TextInput style={styles.priceInput} placeholder="$1.00" placeholderTextColor="#9098B1" keyboardType="numeric" />
-                <Text style={{ color: '#9098B1' }}> - </Text>
-                <TextInput style={styles.priceInput} placeholder="$1000" placeholderTextColor="#9098B1" keyboardType="numeric" />
-              </View>
-
-              {/* Filter: Condition */}
-              <Text style={styles.filterSectionTitle}>Condition</Text>
+              <Text style={styles.filterSectionTitle}>Khoảng giá</Text>
               <View style={styles.chipContainer}>
-                {['New', 'Used', 'Not Specified'].map((chip, index) => (
-                  <TouchableOpacity key={index} style={[styles.chip, index === 0 && styles.chipActive]}>
-                    <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{chip}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Filter: Buying Format */}
-              <Text style={styles.filterSectionTitle}>Buying Format</Text>
-              <View style={styles.chipContainer}>
-                {['All Listings', 'Accept Offers', 'Auction', 'Buy It Now'].map((chip, index) => (
-                  <TouchableOpacity key={index} style={[styles.chip, index === 3 && styles.chipActive]}>
-                    <Text style={[styles.chipText, index === 3 && styles.chipTextActive]}>{chip}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Filter: Item Location */}
-              <Text style={styles.filterSectionTitle}>Item Location</Text>
-              <View style={styles.chipContainer}>
-                {['US Only', 'North America', 'Europe', 'Asia'].map((chip, index) => (
-                  <TouchableOpacity key={index} style={[styles.chip, index === 0 && styles.chipActive]}>
-                    <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{chip}</Text>
+                {PRICE_RANGES.map((range, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.chip, selectedPriceRange === index && styles.chipActive]}
+                    onPress={() => setSelectedPriceRange(selectedPriceRange === index ? null : index)}
+                  >
+                    <Text style={[styles.chipText, selectedPriceRange === index && styles.chipTextActive]}>
+                      {range.label}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
             </ScrollView>
 
-            {/* Modal Footer */}
             <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.applyButton}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.applyButtonText}>Apply Filter</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: Spacing.base }}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Xóa bộ lọc"
+                    variant="outline"
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedPriceRange(null);
+                      setSelectedSort("newest");
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1.5 }}>
+                  <Button
+                    title="Áp dụng"
+                    variant="primary"
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setModalVisible(false);
+                    }}
+                  />
+                </View>
+              </View>
             </View>
 
           </View>
@@ -306,42 +379,48 @@ export default function ProductList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.neutral.bg,
   },
   headerTitleText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#223263",
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
   },
 
   // --- Tool Bar ---
   toolsContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.neutral.white,
     borderBottomWidth: 1,
-    borderBottomColor: "#EBF0FF",
+    borderBottomColor: Colors.neutral.border,
+    gap: Spacing.sm,
   },
   searchWrapper: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EBF0FF",
-    borderRadius: 5,
-    paddingHorizontal: 12,
-    height: 46,
-    marginRight: 12,
+    backgroundColor: Colors.neutral.bg,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.sm,
+    height: 44,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 14,
-    color: "#223263",
+    marginLeft: Spacing.xs,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.primary,
+    height: '100%',
   },
-  iconButton: {
-    padding: 8,
+  filterBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.neutral.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // --- Section Header ---
@@ -349,46 +428,138 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
+    paddingHorizontal: Spacing.base,
+    marginVertical: Spacing.base,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#223263' },
-  resultCount: { fontSize: 14, fontWeight: '700', color: '#40BFFF' },
+  sectionTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary
+  },
+  resultCount: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.neutral.text.secondary
+  },
 
   // --- List & Card ---
-  listContainer: { paddingHorizontal: 16, paddingBottom: 30 },
-  columnWrapper: { justifyContent: "space-between" },
+  listContainer: {
+    paddingHorizontal: Spacing.base,
+    paddingBottom: Spacing["2xl"]
+  },
+  columnWrapper: {
+    justifyContent: "space-between",
+    gap: Spacing.base,
+  },
   card: {
-    width: CARD_WIDTH,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    marginBottom: 16,
+    width: '100%',
+    backgroundColor: Colors.neutral.white,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.base,
+    ...Shadows.sm,
     borderWidth: 1,
-    borderColor: "#EBF0FF",
-    elevation: 3,
-    overflow: "hidden",
+    borderColor: Colors.neutral.border,
+    overflow: 'hidden',
   },
   imageContainer: {
-    height: 140,
-    backgroundColor: "#F6F6F6",
+    width: '100%',
+    height: 160,
+    backgroundColor: Colors.neutral.bg,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
-  cardImage: { width: "100%", height: "100%", resizeMode: "cover" },
-  cardContent: { padding: 12 },
+  cardImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "contain"
+  },
+  cardContent: {
+    padding: Spacing.sm,
+    gap: 4
+  },
   cardTitle: {
-    fontSize: 14, fontWeight: "700", color: "#223263",
-    marginBottom: 8, minHeight: 36, lineHeight: 18,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    marginBottom: 4,
+    height: 36,
   },
-  ratingContainer: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
-  priceContainer: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
-  currentPrice: { fontSize: 14, fontWeight: "700", color: "#40BFFF", marginRight: 8 },
-  originalPrice: { fontSize: 10, color: "#9098B1", textDecorationLine: "line-through" },
-  reviewsWrapper: { marginTop: 2 },
-  reviewText: { fontSize: 10, color: "#9098B1", fontWeight: '500' },
-  emptyContainer: { alignItems: 'center', marginTop: 50 },
-  emptyText: { marginTop: 10, fontSize: 16, color: "#9098B1" },
+  discountBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: Colors.accent.error,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderBottomRightRadius: BorderRadius.md,
+    zIndex: 1,
+  },
+  discountText: {
+    fontSize: 10,
+    color: Colors.neutral.white,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.neutral.text.primary,
+  },
+  soldText: {
+    fontSize: 10,
+    color: Colors.neutral.text.tertiary,
+  },
+  priceContainer: {
+    marginTop: 2,
+  },
+  currentPrice: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary.main,
+  },
+  priceRow: {
+    height: 16,
+    justifyContent: 'center',
+  },
+  originalPrice: {
+    fontSize: 10,
+    color: Colors.neutral.text.tertiary,
+    textDecorationLine: "line-through"
+  },
+
+  // --- Empty State ---
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 80,
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyIconWrap: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: Colors.neutral.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+    ...Shadows.sm,
+  },
+  emptyTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    marginBottom: Spacing.xs,
+  },
+  emptyText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 
   // --- MODAL STYLES ---
   modalOverlay: {
@@ -397,46 +568,75 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    height: '80%',
-    padding: 16,
+    backgroundColor: Colors.neutral.white,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    maxHeight: '70%',
+    padding: Spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 40 : Spacing.lg,
   },
   modalHeader: {
+    alignItems: 'center',
+    marginBottom: Spacing.base,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.neutral.border,
+    marginBottom: Spacing.base,
+  },
+  modalHeaderContent: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EBF0FF',
-    paddingBottom: 16,
   },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: '#223263' },
+  modalTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary
+  },
+  closeBtn: {
+    padding: 4,
+  },
   filterSectionTitle: {
-    fontSize: 14, fontWeight: '700', color: '#223263', marginTop: 16, marginBottom: 12,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.base,
   },
-  priceInputs: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
   },
-  priceInput: {
-    borderWidth: 1, borderColor: '#EBF0FF', borderRadius: 5,
-    padding: 12, width: '45%', color: '#223263', textAlign: 'center',
-  },
-  chipContainer: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: {
-    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 5,
-    borderWidth: 1, borderColor: '#EBF0FF', marginRight: 8, marginBottom: 8,
-    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.neutral.border,
+    backgroundColor: Colors.neutral.white,
   },
   chipActive: {
-    backgroundColor: 'rgba(64, 191, 255, 0.1)', borderColor: '#40BFFF',
+    backgroundColor: Colors.primary.light,
+    borderColor: Colors.primary.main,
   },
-  chipText: { color: '#9098B1', fontSize: 12, fontWeight: '700' },
-  chipTextActive: { color: '#40BFFF' },
-  modalFooter: { marginTop: 20 },
-  applyButton: {
-    backgroundColor: '#40BFFF', padding: 16, borderRadius: 5, alignItems: 'center',
+  chipText: {
+    color: Colors.neutral.text.secondary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium
   },
-  applyButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  chipTextActive: {
+    color: Colors.primary.main,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  modalFooter: {
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.base,
+    borderTopWidth: 1,
+    borderTopColor: Colors.neutral.border,
+  },
 });

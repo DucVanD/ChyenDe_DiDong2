@@ -13,13 +13,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from '@/constants/theme';
+import * as Haptics from 'expo-haptics';
 
-const STATUS_MAP: { [key: number]: { label: string, color: string } } = {
-  0: { label: 'Chờ xác nhận', color: '#FFC107' },
-  1: { label: 'Đã xác nhận', color: '#40BFFF' },
-  2: { label: 'Đang giao hàng', color: '#5C61F4' },
-  3: { label: 'Đã hoàn thành', color: '#53D1B6' },
-  4: { label: 'Đã hủy', color: '#FB7181' },
+const STATUS_MAP: { [key: number]: { label: string, color: string, bg: string } } = {
+  0: { label: 'Chờ xác nhận', color: '#F59E0B', bg: '#FEF3C7' },
+  1: { label: 'Đã xác nhận', color: Colors.primary.main, bg: Colors.primary.light },
+  2: { label: 'Đang chuẩn bị', color: '#8B5CF6', bg: '#EDE9FE' },
+  3: { label: 'Đang giao hàng', color: '#3B82F6', bg: '#DBEAFE' },
+  4: { label: 'Đã hoàn thành', color: Colors.accent.success, bg: '#DCFCE7' },
+  5: { label: 'Đã hủy', color: Colors.accent.error, bg: '#FEE2E2' },
 };
 
 const OrderS = () => {
@@ -44,36 +47,48 @@ const OrderS = () => {
 
   const renderOrderItem = ({ item }: { item: Order }) => {
     const statusNumber = getStatusNumber(item.status || 'PENDING');
-    const statusInfo = STATUS_MAP[statusNumber] || { label: 'Không xác định', color: '#9098B1' };
+    const statusInfo = STATUS_MAP[statusNumber] || { label: 'Không xác định', color: Colors.neutral.text.tertiary, bg: Colors.neutral.bg };
 
     return (
       <TouchableOpacity
         style={styles.orderCard}
         onPress={() => {
+          Haptics.selectionAsync();
           router.push({
             pathname: "/orderDetail",
             params: { id: item.id }
           });
         }}
       >
-        <Text style={styles.orderCode}>Mã ĐH: #{item.id || ''}</Text>
-        <Text style={styles.orderDate}>Ngày đặt: {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '-'}</Text>
-
-        <View style={styles.dashedLine} />
-
-        <View style={styles.rowDetail}>
-          <Text style={styles.label}>Trạng thái</Text>
-          <Text style={[styles.valueText, { color: statusInfo.color, fontWeight: '700' }]}>{statusInfo.label}</Text>
+        <View style={styles.orderCardHeader}>
+          <Text style={styles.orderCode}>Mã ĐH: #{item.id || ''}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+            <Text style={[styles.statusLabel, { color: statusInfo.color }]}>
+              {statusInfo.label}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.rowDetail}>
-          <Text style={styles.label}>Sản phẩm</Text>
-          <Text style={styles.valueText}>{item.orderDetails?.length || 0} sản phẩm</Text>
+        <Text style={styles.orderDate}>
+          <Ionicons name="time-outline" size={14} color={Colors.neutral.text.tertiary} /> {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '-'}
+        </Text>
+
+        <View style={styles.separator} />
+
+        <View style={styles.orderDetails}>
+          <View style={styles.rowDetail}>
+            <Text style={styles.label}>Sản phẩm</Text>
+            <Text style={styles.valueText}>{item.orderDetails?.length || 0} sản phẩm</Text>
+          </View>
+          <View style={styles.rowDetail}>
+            <Text style={styles.label}>Tổng tiền</Text>
+            <Text style={styles.priceValue}>{(item.totalAmount || 0).toLocaleString('vi-VN')}đ</Text>
+          </View>
         </View>
 
-        <View style={styles.rowDetail}>
-          <Text style={styles.label}>Tổng tiền</Text>
-          <Text style={styles.priceValue}>{(item.totalAmount || 0).toLocaleString('vi-VN')}đ</Text>
+        <View style={styles.orderCardFooter}>
+          <Text style={styles.viewDetailText}>Xem chi tiết</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.primary.main} />
         </View>
       </TouchableOpacity>
     );
@@ -83,15 +98,15 @@ const OrderS = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#9098B1" />
+          <Ionicons name="chevron-back" size={24} color={Colors.neutral.text.secondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Đơn hàng của tôi</Text>
+        <Text style={styles.headerTitle}>Đơn hàng</Text>
         <View style={{ width: 24 }} />
       </View>
 
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#40BFFF" />
+          <ActivityIndicator size="large" color={Colors.primary.main} />
         </View>
       ) : (
         <FlatList
@@ -101,9 +116,12 @@ const OrderS = () => {
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 50 }}>
-              <Ionicons name="bag-outline" size={64} color="#EBF0FF" />
-              <Text style={{ color: '#9098B1', marginTop: 16 }}>Bạn chưa có đơn hàng nào</Text>
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="bag-outline" size={48} color={Colors.neutral.text.tertiary} />
+              </View>
+              <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
+              <Text style={styles.emptySubtitle}>Bạn chưa thực hiện bất kỳ giao dịch nào</Text>
             </View>
           }
         />
@@ -115,78 +133,131 @@ const OrderS = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.neutral.white,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: Spacing.base,
     borderBottomWidth: 1,
-    borderBottomColor: '#EBF0FF',
+    borderBottomColor: Colors.neutral.border,
+    backgroundColor: Colors.neutral.white,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#223263',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
   },
   backButton: {
     padding: 4,
   },
   listContainer: {
-    padding: 16,
+    padding: Spacing.base,
   },
+
+  // Order Card
   orderCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#EBF0FF',
-    borderRadius: 5,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#9098B1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    backgroundColor: Colors.neutral.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    marginBottom: Spacing.base,
+    ...Shadows.md,
   },
-  orderCode: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#223263',
+  orderCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  orderDate: {
-    fontSize: 12,
-    color: '#9098B1',
-    marginBottom: 12,
+  orderCode: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
   },
-  dashedLine: {
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  statusLabel: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  orderDate: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.neutral.text.tertiary,
+    marginBottom: Spacing.md,
+  },
+  separator: {
     height: 1,
-    borderWidth: 1,
-    borderColor: '#EBF0FF',
-    borderStyle: 'dashed',
-    marginBottom: 12,
-    borderRadius: 1,
+    backgroundColor: Colors.neutral.bg,
+    marginBottom: Spacing.md,
+  },
+  orderDetails: {
+    gap: 8,
   },
   rowDetail: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
     alignItems: 'center',
   },
   label: {
-    fontSize: 12,
-    color: '#9098B1',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
   },
   valueText: {
-    fontSize: 12,
-    color: '#223263',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.primary,
+    fontWeight: Typography.fontWeight.medium,
   },
   priceValue: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#40BFFF',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary.main,
+  },
+  orderCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: Spacing.base,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.neutral.bg,
+  },
+  viewDetailText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary.main,
+    marginRight: 4,
+  },
+
+  // Empty State
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 100,
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.neutral.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.neutral.text.secondary,
+    textAlign: 'center',
   },
 });
 

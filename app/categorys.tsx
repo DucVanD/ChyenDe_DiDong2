@@ -9,8 +9,10 @@ import {
   StatusBar,
   FlatList,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors, Spacing, BorderRadius, Typography } from "@/constants/theme";
+import * as Haptics from 'expo-haptics';
 
 // Dữ liệu danh sách Category (Gộp chung thành 1 list như hình)
 const CATEGORIES = [
@@ -31,33 +33,36 @@ const CATEGORIES = [
 
 export default function Category() {
   const router = useRouter();
-  
+
   // State để lưu ID của item đang được chọn (để tô màu nền)
   const [selectedId, setSelectedId] = useState<string | null>("2"); // Mặc định chọn Bikini (id: 2) giống hình
 
   const renderItem = ({ item }: { item: any }) => {
-    // Kiểm tra xem item này có đang được chọn không
     const isSelected = item.id === selectedId;
 
     return (
       <TouchableOpacity
         style={[
           styles.itemContainer,
-          isSelected && styles.itemSelected, // Nếu chọn thì áp dụng style nền màu
+          isSelected && styles.itemSelected,
         ]}
-        onPress={() => setSelectedId(item.id)}
+        onPress={() => {
+          Haptics.selectionAsync();
+          setSelectedId(item.id);
+        }}
+        activeOpacity={0.7}
       >
         <View style={styles.iconContainer}>
-          <Ionicons 
-            name={item.icon} 
-            size={24} 
-            color="#40BFFF" // Icon luôn màu xanh
+          <Ionicons
+            name={item.icon}
+            size={22}
+            color={isSelected ? Colors.primary.main : Colors.neutral.text.secondary}
           />
         </View>
         <Text
           style={[
             styles.itemText,
-            isSelected && styles.itemTextSelected, // Có thể đổi màu chữ hoặc đậm hơn nếu muốn
+            isSelected && styles.itemTextSelected,
           ]}
         >
           {item.label}
@@ -71,9 +76,10 @@ export default function Category() {
       {/* HEADER: Back Button + Title */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#9098B1" />
+          <Ionicons name="chevron-back" size={24} color={Colors.neutral.text.secondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Category</Text>
+        <Text style={styles.headerTitle}>Danh mục</Text>
+        <View style={{ width: 24 }} />
       </View>
 
       {/* LIST CATEGORY */}
@@ -91,58 +97,53 @@ export default function Category() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.neutral.white,
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
-
-  // --- Header ---
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    justifyContent: "space-between",
+    padding: Spacing.base,
     borderBottomWidth: 1,
-    borderBottomColor: "#EBF0FF",
-    backgroundColor: "#fff",
+    borderBottomColor: Colors.neutral.border,
+    backgroundColor: Colors.neutral.white,
   },
   backButton: {
-    marginRight: 12,
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#223263",
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
   },
-
-  // --- List Item ---
   listContent: {
-    paddingBottom: 20,
+    paddingVertical: Spacing.sm,
   },
   itemContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: "#fff", // Nền mặc định là trắng
+    paddingVertical: Spacing.base,
+    paddingHorizontal: Spacing.base,
+    backgroundColor: Colors.neutral.white,
   },
-  // Style cho hiệu ứng chọn (Selected)
   itemSelected: {
-    backgroundColor: "#EBF0FF", // Màu nền xanh nhạt khi được chọn (giống hình)
+    backgroundColor: Colors.primary.light + '40',
   },
-  
   iconContainer: {
-    width: 24,
-    height: 24,
+    width: 36,
+    height: 36,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
+    marginRight: Spacing.base,
   },
   itemText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#223263", // Màu chữ xanh đen đậm
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.neutral.text.primary,
   },
   itemTextSelected: {
-    color: "#40BFFF", // (Tuỳ chọn) Đổi màu chữ thành xanh sáng khi chọn
+    color: Colors.primary.main,
+    fontWeight: Typography.fontWeight.bold,
   },
 });

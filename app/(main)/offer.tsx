@@ -1,82 +1,220 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Image,
   SafeAreaView,
   Platform,
   StatusBar,
   ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Clipboard,
+  TextInput,
 } from "react-native";
-import ProductDiscount from "@/app/components/offer/ProductDiscount"; // Giữ nguyên import của bạn
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from "expo-router";
+import { getActiveVouchers, Voucher } from "@/services/voucher.service";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
+import { showToast } from "@/app/components/common/Toast";
+import * as Haptics from 'expo-haptics';
+
+const SAVED_VOUCHERS_KEY = 'saved_vouchers';
 
 export default function OfferScreen() {
+  const router = useRouter();
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savedVoucherIds, setSavedVoucherIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    loadVouchers();
+    loadSavedVouchers();
+  }, []);
+
+  const loadVouchers = async () => {
+    try {
+      setLoading(true);
+      const data = await getActiveVouchers();
+      setVouchers(data);
+    } catch (error) {
+      console.error("Error loading vouchers:", error);
+      showToast({ message: "Không thể tải danh sách ưu đãi", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSavedVouchers = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(SAVED_VOUCHERS_KEY);
+      if (saved) {
+        setSavedVoucherIds(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error("Error loading saved vouchers:", error);
+    }
+  };
+
+  const toggleSaveVoucher = async (voucherId: number) => {
+    try {
+      let newSavedIds: number[];
+      if (savedVoucherIds.includes(voucherId)) {
+        newSavedIds = savedVoucherIds.filter(id => id !== voucherId);
+      } else {
+        newSavedIds = [...savedVoucherIds, voucherId];
+      }
+      setSavedVoucherIds(newSavedIds);
+      await AsyncStorage.setItem(SAVED_VOUCHERS_KEY, JSON.stringify(newSavedIds));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      showToast({
+        message: savedVoucherIds.includes(voucherId) ? "Đã gỡ voucher" : "Đã lưu voucher",
+        type: "success"
+      });
+    } catch (error) {
+      console.error("Error saving voucher:", error);
+    }
+  };
+
+  const copyVoucherCode = (code: string) => {
+    Clipboard.setString(code);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    showToast({ message: `Mã "${code}" đã được sao chép`, type: "success" });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const getDiscountText = (voucher: Voucher) => {
+    if (voucher.discountType === 'PERCENTAGE') {
+      return `${voucher.discountValue}%`;
+    } else {
+      return formatCurrency(voucher.discountValue);
+    }
+  };
+
+  const getRemainingVouchers = (voucher: Voucher) => {
+    return voucher.usageLimit - voucher.usedCount;
+  };
+
+  const getGradientColors = (index: number): [string, string] => {
+    const gradients: [string, string][] = [
+      ['#667EEA', '#764BA2'],
+      ['#F093FB', '#F5576C'],
+      ['#4FACFE', '#00F2FE'],
+      ['#43E97B', '#38F9D7'],
+      ['#FA709A', '#FEE140'],
+      ['#30CFD0', '#330867'],
+    ];
+    return gradients[index % gradients.length];
+  };
+
+  const renderVoucherCard = (voucher: Voucher, index: number) => {
+    const isSaved = savedVoucherIds.includes(voucher.id);
+    const remaining = getRemainingVouchers(voucher);
+    const isPercentage = voucher.discountType === 'PERCENTAGE';
+
+    return (
+      <View key={voucher.id} style={styles.voucherCard}>
+        <View style={styles.voucherLeft}>
+          <Text style={styles.discountValue}>
+            {isPercentage ? `${voucher.discountValue}%` : 'GIẢM'}
+          </Text>
+          {!isPercentage && (
+            <Text style={styles.fixedAmount}>
+              {voucher.discountValue >= 1000 ? `${voucher.discountValue / 1000}k` : voucher.discountValue}
+            </Text>
+          )}
+          <Text style={styles.offLabel}>GIẢM GIÁ</Text>
+        </View>
+
+        <View style={styles.voucherRight}>
+          <View style={styles.voucherMainInfo}>
+            <Text style={styles.voucherName} numberOfLines={1}>{voucher.voucherCode}</Text>
+            <TouchableOpacity
+              onPress={() => toggleSaveVoucher(voucher.id)}
+              style={styles.saveBtn}
+            >
+              <Ionicons
+                name={isSaved ? "bookmark" : "bookmark-outline"}
+                size={20}
+                color={isSaved ? Colors.primary.main : Colors.neutral.text.tertiary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.voucherDesc} numberOfLines={2}>
+            {voucher.description || `Giảm ${getDiscountText(voucher)} cho đơn từ ${formatCurrency(voucher.minOrderAmount)}`}
+          </Text>
+
+          <View style={styles.voucherFooter}>
+            <View style={styles.expiryBox}>
+              <Ionicons name="time-outline" size={12} color={Colors.neutral.text.tertiary} />
+              <Text style={styles.expiryText}>HSD: {formatDate(voucher.endDate)}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => copyVoucherCode(voucher.voucherCode)}
+              style={styles.useBtn}
+            >
+              <Text style={styles.useBtnText}>Dùng ngay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Semi-circle cutouts */}
+        <View style={styles.cutoutTop} />
+        <View style={styles.cutoutBottom} />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* HEADER: Chuyển thành text Offer lớn bên trái */}
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Offer</Text>
+        <Text style={styles.headerTitle}>Ưu Đãi Đặc Biệt</Text>
+        <Text style={styles.headerSubtitle}>
+          {vouchers.length} mã giảm giá đang hoạt động
+        </Text>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. BLUE COUPON BANNER */}
-        <View style={styles.couponBanner}>
-          <Text style={styles.couponText}>
-            Use “MEGSL” Cupon For{"\n"}Get 90%off
-          </Text>
-        </View>
-
-        {/* 2. SUPER FLASH SALE BANNER (Có đồng hồ) */}
-        <View style={styles.bannerContainer}>
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80", // Giày đỏ/đen
-            }}
-            style={styles.bannerImage}
-          />
-          <View style={styles.bannerOverlay}>
-            <Text style={styles.bannerTitle}>Khuyến Mãi Đặc Biệt</Text>
-            <Text style={styles.bannerSubtitle}>50% Off</Text>
-
-            <View style={styles.timerContainer}>
-              <View style={styles.timerBox}>
-                <Text style={styles.timerText}>08</Text>
-              </View>
-              <Text style={styles.timerColon}>:</Text>
-              <View style={styles.timerBox}>
-                <Text style={styles.timerText}>34</Text>
-              </View>
-              <Text style={styles.timerColon}>:</Text>
-              <View style={styles.timerBox}>
-                <Text style={styles.timerText}>52</Text>
-              </View>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary.main} />
+            <Text style={styles.loadingText}>Đang tìm ưu đãi tốt nhất cho bạn...</Text>
+          </View>
+        ) : vouchers.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconWrap}>
+              <MaterialCommunityIcons name="ticket-percent-outline" size={64} color={Colors.neutral.text.tertiary} />
             </View>
+            <Text style={styles.emptyText}>Chưa có ưu đãi nào</Text>
+            <Text style={styles.emptySubtext}>Vui lòng quay lại sau nhé!</Text>
           </View>
-        </View>
-
-        {/* 3. SUPER MEGA SALE BANNER (Màu hồng/tím) */}
-        <View style={styles.bannerContainer}>
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1560769629-975e13f0c470?auto=format&fit=crop&w=800&q=80", // Giày style fashion/hồng
-            }}
-            style={styles.bannerImage}
-          />
-          <View style={styles.bannerOverlay}>
-            <Text style={styles.bannerTitle}>Giảm Giá 90% Siêu Hấp Dẫn</Text>
-            <Text style={styles.specialText}>Special birthday Lafyuu</Text>
-          </View>
-        </View>
-
-        {/* 4. LIST SẢN PHẨM GIẢM GIÁ (Giữ nguyên component cũ) */}
-        <View style={styles.productListContainer}>
-          <ProductDiscount />
-        </View>
-
+        ) : (
+          <>
+            {/* Voucher List */}
+            <View style={styles.voucherList}>
+              <Text style={styles.sectionTitle}>Tất cả ưu đãi dành cho bạn</Text>
+              {vouchers.map((voucher, index) => renderVoucherCard(voucher, index))}
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -85,117 +223,184 @@ export default function OfferScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.neutral.bg,
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-
-  // --- Header Styles ---
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: Spacing.xl,
+    minHeight: 68,
+    backgroundColor: Colors.neutral.white,
     borderBottomWidth: 1,
-    borderBottomColor: "#EBF0FF",
-    backgroundColor: "#fff",
-  },
-  headerTitle: {
-    fontSize: 18, // Kích thước chữ tiêu đề Offer
-    fontWeight: "700",
-    color: "#223263",
-    textAlign: "left",
-  },
-
-  // --- Blue Coupon Banner ---
-  couponBanner: {
-    backgroundColor: "#40BFFF", // Màu xanh dương giống hình
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 5,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    borderBottomColor: Colors.neutral.border,
     justifyContent: "center",
   },
-  couponText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    lineHeight: 24, // Tăng khoảng cách dòng để dễ đọc
-    width: "70%", // Giới hạn chiều rộng để text xuống dòng giống hình
+  headerTitle: {
+    fontSize: Typography.fontSize["2xl"],
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    marginBottom: Spacing.xs,
   },
-
-  // --- General Banner Styles ---
-  bannerContainer: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 5,
-    overflow: "hidden",
-    position: "relative",
-    height: 206,
+  headerSubtitle: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
   },
-  bannerImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
+  scrollContent: {
+    paddingBottom: Spacing.xl,
   },
-  bannerOverlay: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    justifyContent: "center", // Căn giữa nội dung theo chiều dọc
-    paddingLeft: 24,
-    backgroundColor: 'rgba(0,0,0,0.1)' // Thêm lớp phủ nhẹ để chữ nổi hơn nếu ảnh sáng
-  },
-  bannerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 8,
-    width: "70%", // Giới hạn chiều rộng text
-  },
-  bannerSubtitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 16,
-  },
-  specialText: {
-    fontSize: 14,
-    fontWeight: "400",
-    color: "#fff",
-    marginTop: 4,
-  },
-
-  // --- Timer Styles ---
-  timerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  timerBox: {
-    backgroundColor: "#fff",
-    borderRadius: 5,
-    width: 42,
-    height: 42,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 100,
   },
-  timerText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#223263",
+  loadingText: {
+    marginTop: Spacing.base,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
   },
-  timerColon: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
-    marginHorizontal: 8,
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+    paddingHorizontal: Spacing["2xl"],
   },
-
-  // --- Product List Container ---
-  productListContainer: {
-    marginTop: 16,
-  }
+  emptyIconWrap: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: Colors.neutral.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+    ...Shadows.sm,
+  },
+  emptyText: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+  },
+  emptySubtext: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
+    marginTop: Spacing.xs,
+    textAlign: 'center',
+  },
+  voucherList: {
+    marginTop: Spacing.base,
+    paddingHorizontal: Spacing.base,
+  },
+  sectionTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    marginBottom: Spacing.base,
+    paddingHorizontal: Spacing.base,
+    marginTop: Spacing.sm,
+  },
+  voucherCard: {
+    flexDirection: 'row',
+    marginBottom: Spacing.base,
+    backgroundColor: Colors.neutral.white,
+    borderRadius: BorderRadius.lg,
+    minHeight: 100,
+    ...Shadows.sm,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  voucherLeft: {
+    width: 100,
+    backgroundColor: Colors.primary.main,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.sm,
+  },
+  discountValue: {
+    fontSize: 24,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.white,
+  },
+  fixedAmount: {
+    fontSize: 18,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.white,
+    marginTop: -4,
+  },
+  offLabel: {
+    fontSize: 10,
+    fontWeight: Typography.fontWeight.medium,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+    letterSpacing: 1,
+  },
+  voucherRight: {
+    flex: 1,
+    padding: Spacing.base,
+    justifyContent: 'space-between',
+  },
+  voucherMainInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  voucherName: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    flex: 1,
+  },
+  saveBtn: {
+    padding: 4,
+  },
+  voucherDesc: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.neutral.text.secondary,
+    lineHeight: 16,
+    marginBottom: Spacing.sm,
+  },
+  voucherFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 'auto',
+  },
+  expiryBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  expiryText: {
+    fontSize: 10,
+    color: Colors.neutral.text.tertiary,
+  },
+  useBtn: {
+    backgroundColor: Colors.primary.light,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  useBtnText: {
+    fontSize: 11,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary.main,
+  },
+  cutoutTop: {
+    position: 'absolute',
+    top: -8,
+    left: 92,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.neutral.bg,
+  },
+  cutoutBottom: {
+    position: 'absolute',
+    bottom: -8,
+    left: 92,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.neutral.bg,
+  },
 });

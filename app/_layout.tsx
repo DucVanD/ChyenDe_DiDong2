@@ -1,20 +1,22 @@
 import { Stack } from "expo-router";
+import { ToastProvider } from "./components/common/ToastProvider";
 
 export default function RootLayout() {
   return (
-    // Thêm initialRouteName="splash" để ép app chạy trang này đầu tiên
-    <Stack initialRouteName="splash" screenOptions={{ headerShown: false }}>
-      
-      {/* Welcome / Splash */}
-      <Stack.Screen name="splash" />
+    <ToastProvider>
+      {/* Thêm initialRouteName="splash" để ép app chạy trang này đầu tiên */}
+      <Stack initialRouteName="splash" screenOptions={{ headerShown: false }}>
 
-      {/* Auth */}
-      <Stack.Screen name="(auth)" />
+        {/* Welcome / Splash */}
+        <Stack.Screen name="splash" />
 
-      {/* Main Tabs */}
-      <Stack.Screen name="(main)" />
+        {/* Auth */}
+        <Stack.Screen name="(auth)" />
 
+        {/* Main Tabs */}
+        <Stack.Screen name="(main)" />
 
-    </Stack>
+      </Stack>
+    </ToastProvider>
   );
 }

@@ -139,5 +139,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#FB7181",
     fontWeight: "bold",
+    minWidth: 50,
+    textAlign: "center",
   },
 });

@@ -25,7 +25,7 @@ import { API_BASE_URL, STORAGE_KEYS } from "../config/api.config";
 const httpAxios = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 15000,
+  timeout: 30000,
 });
 
 // ========================================

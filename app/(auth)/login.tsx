@@ -10,11 +10,16 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  SafeAreaView,
+  Platform,
+  StatusBar,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 import { login } from "../../services/auth.service";
 import { syncCartAfterLogin } from "../../services/cart.service";
 import { STORAGE_KEYS } from "../../config/api.config";
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
 
 export default function Login() {
   const router = useRouter();
@@ -31,43 +36,37 @@ export default function Login() {
         const savedEmail = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_EMAIL);
         const rememberFlag = await AsyncStorage.getItem(STORAGE_KEYS.REMEMBER_ME);
 
-        if (savedEmail && rememberFlag === "true") {
+        if (savedEmail) {
           setEmail(savedEmail);
+        }
+
+        if (rememberFlag === "true") {
           setRememberMe(true);
         }
       } catch (error) {
-        console.error("Error loading saved email:", error);
+        // Silent error
       }
     };
     loadSavedEmail();
   }, []);
 
   const handleSignIn = async () => {
-    // Validation
     if (email.trim() === "" || password.trim() === "") {
-      const msg = "Vui lòng nhập đầy đủ Email và Mật khẩu!";
-      console.error("❌", msg);
-      Alert.alert("Lỗi", msg);
+      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ Email và Mật khẩu!");
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      const msg = "Vui lòng nhập địa chỉ email hợp lệ!";
-      console.error("❌", msg);
-      Alert.alert("Lỗi", msg);
+      Alert.alert("Lỗi", "Vui lòng nhập địa chỉ email hợp lệ!");
       return;
     }
 
-    console.log("🔑 Đang đăng nhập...", { email });
     setLoading(true);
 
     try {
-      const result = await login(email, password);
-      console.log("✅ Đăng nhập thành công!", result.user);
+      await login(email, password);
 
-      // Save or clear email based on remember me checkbox
       if (rememberMe) {
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_EMAIL, email);
         await AsyncStorage.setItem(STORAGE_KEYS.REMEMBER_ME, "true");
@@ -76,217 +75,287 @@ export default function Login() {
         await AsyncStorage.removeItem(STORAGE_KEYS.REMEMBER_ME);
       }
 
-      // Sync guest cart with backend
       await syncCartAfterLogin();
-
-      // Đăng nhập thành công, chuyển hướng vào trang chủ
       router.replace("/(main)");
     } catch (error: any) {
-      const errorMsg = error.message || "Vui lòng thử lại sau!";
-      console.error("❌ Đăng nhập thất bại:", errorMsg);
-      Alert.alert("Đăng nhập thất bại", errorMsg);
+      Alert.alert("Đăng nhập thất bại", error.message || "Vui lòng thử lại sau!");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      {/* Logo */}
-      <View style={styles.logoWrap}>
-        {/* Đảm bảo đường dẫn ảnh đúng với thư mục assets của bạn */}
-        <Image
-          source={require("../../assets/images/logo.png")}
-          style={styles.logo}
-        />
-      </View>
-
-      <Text style={styles.title}>Welcome to E-com</Text>
-      <Text style={styles.subtitle}>Sign in to continue</Text>
-
-      {/* Email Input */}
-      <View style={styles.inputWrap}>
-        <Ionicons
-          name="mail-outline"
-          size={20}
-          color="#777"
-          style={styles.inputIcon}
-        />
-        <TextInput
-          placeholder="Your Email"
-          style={styles.input}
-          placeholderTextColor="#aaa"
-          value={email}
-          onChangeText={setEmail} // Cập nhật state khi gõ
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-      </View>
-
-      {/* Password Input */}
-      <View style={styles.inputWrap}>
-        <Ionicons
-          name="lock-closed-outline"
-          size={20}
-          color="#777"
-          style={styles.inputIcon}
-        />
-        <TextInput
-          placeholder="Password"
-          secureTextEntry
-          style={styles.input}
-          placeholderTextColor="#aaa"
-          value={password}
-          onChangeText={setPassword} // Cập nhật state khi gõ
-        />
-      </View>
-
-      {/* Remember Me Checkbox */}
-      <TouchableOpacity
-        style={styles.rememberMeContainer}
-        onPress={() => setRememberMe(!rememberMe)}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-          {rememberMe && <Ionicons name="checkmark" size={16} color="#fff" />}
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Logo Section */}
+        <View style={styles.logoWrap}>
+          <View style={styles.logoCircle}>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={styles.logo}
+            />
+          </View>
         </View>
-        <Text style={styles.rememberMeText}>Nhớ tài khoản email</Text>
-      </TouchableOpacity>
 
-      {/* Button Sign In */}
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleSignIn}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Sign In</Text>
-        )}
-      </TouchableOpacity>
+        <View style={styles.contentWrap}>
+          <Text style={styles.title}>Chào mừng trở lại</Text>
+          <Text style={styles.subtitle}>Đăng nhập để trải nghiệm mua sắm tuyệt vời</Text>
 
-      <Text style={styles.or}>OR</Text>
+          {/* Email Input */}
+          <View style={styles.inputWrap}>
+            <Ionicons
+              name="mail-outline"
+              size={20}
+              color={Colors.neutral.text.tertiary}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              placeholder="Email của bạn"
+              style={styles.input}
+              placeholderTextColor={Colors.neutral.text.tertiary}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
 
-      {/* Các nút Social giữ nguyên (chưa cần xử lý) */}
-      <TouchableOpacity style={styles.socialBtn}>
-        <Ionicons
-          name="logo-google"
-          size={22}
-          color="#DB4437"
-          style={{ marginRight: 10 }}
-        />
-        <Text style={styles.socialText}>Login with Google</Text>
-      </TouchableOpacity>
+          {/* Password Input */}
+          <View style={styles.inputWrap}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={20}
+              color={Colors.neutral.text.tertiary}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              placeholder="Mật khẩu"
+              secureTextEntry
+              style={styles.input}
+              placeholderTextColor={Colors.neutral.text.tertiary}
+              value={password}
+              onChangeText={setPassword}
+            />
+          </View>
 
-      <TouchableOpacity style={styles.socialBtn}>
-        <Ionicons
-          name="logo-facebook"
-          size={22}
-          color="#1877F2"
-          style={{ marginRight: 10 }}
-        />
-        <Text style={styles.socialText}>Login with Facebook</Text>
-      </TouchableOpacity>
+          {/* Remember Me & Forgot Password */}
+          <View style={styles.rowActions}>
+            <TouchableOpacity
+              style={styles.rememberMeContainer}
+              onPress={() => setRememberMe(!rememberMe)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                {rememberMe && <Ionicons name="checkmark" size={14} color={Colors.neutral.white} />}
+              </View>
+              <Text style={styles.rememberMeText}>Nhớ tài khoản</Text>
+            </TouchableOpacity>
 
-      <TouchableOpacity>
-        <Text style={styles.forgot}>Forgot Password?</Text>
-      </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password")}>
+              <Text style={styles.forgot}>Quên mật khẩu?</Text>
+            </TouchableOpacity>
+          </View>
 
-      <Text style={styles.footerText}>
-        Don't have an account?{" "}
-        <Link href="/register" style={styles.footerLink}>
-          Register
-        </Link>
-      </Text>
-    </View>
+          {/* Sign In Button */}
+          <TouchableOpacity
+            onPress={handleSignIn}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[Colors.primary.main, Colors.primary.dark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.button, loading && styles.buttonDisabled]}
+            >
+              {loading ? (
+                <ActivityIndicator color={Colors.neutral.white} />
+              ) : (
+                <Text style={styles.buttonText}>Đăng Nhập</Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={styles.dividerWrap}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.or}>HOẶC ĐĂNG NHẬP VỚI</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Social Sign In */}
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={styles.socialBtn}>
+              <Ionicons name="logo-google" size={24} color="#DB4437" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialBtn}>
+              <Ionicons name="logo-facebook" size={24} color="#1877F2" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.footerText}>
+            Chưa có tài khoản?{" "}
+            <Link href="/register" style={styles.footerLink}>
+              Đăng Ký ngay
+            </Link>
+          </Text>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 25 },
-
-  logoWrap: { alignItems: "center", marginTop: 40, marginBottom: 10 },
-  logo: { width: 80, height: 80, resizeMode: "contain" },
-
-  title: {
-    fontSize: 24,
-    textAlign: "center",
-    fontWeight: "bold",
-    color: "#222",
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.neutral.white,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
-  subtitle: { textAlign: "center", color: "#777", marginBottom: 25 },
-
+  container: {
+    flex: 1,
+    paddingHorizontal: Spacing.xl,
+  },
+  logoWrap: {
+    alignItems: "center",
+    marginTop: 60,
+    marginBottom: 40,
+  },
+  logoCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary.light,
+    justifyContent: "center",
+    alignItems: "center",
+    ...Shadows.md,
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    resizeMode: "contain",
+  },
+  contentWrap: {
+    flex: 1,
+  },
+  title: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
+    textAlign: "center",
+    marginTop: 8,
+    marginBottom: 32,
+  },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 10,
-    marginBottom: 15,
-    paddingHorizontal: 15,
-    height: 55,
+    backgroundColor: Colors.neutral.bg,
+    borderRadius: BorderRadius.md,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    height: 56,
+    borderWidth: 1,
+    borderColor: Colors.neutral.border,
   },
-
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 16, color: "#333" },
-
-  button: {
-    backgroundColor: "#47B5FF",
-    height: 55,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 10,
-    shadowColor: "#47B5FF",
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4, // Đổ bóng cho Android
+  inputIcon: {
+    marginRight: 12,
   },
-
-  buttonText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  buttonDisabled: { opacity: 0.6 },
-
-  or: { textAlign: "center", color: "#777", marginVertical: 15 },
-
-  socialBtn: {
-    flexDirection: "row",
-    backgroundColor: "#F9F9F9",
-    height: 55,
-    borderRadius: 10,
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 15,
+  input: {
+    flex: 1,
+    fontSize: Typography.fontSize.base,
+    color: Colors.neutral.text.primary,
   },
-
-  socialText: { color: "#333", fontSize: 16 },
-
-  forgot: { textAlign: "center", color: "#47B5FF", marginTop: 5 },
-
-  footerText: { textAlign: "center", color: "#777", marginTop: 15 },
-  footerLink: { color: "#47B5FF", fontWeight: "bold" },
-
-  // Remember Me Styles
+  rowActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
   rememberMeContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
-    marginBottom: 5,
   },
   checkbox: {
     width: 20,
     height: 20,
-    borderWidth: 2,
-    borderColor: "#47B5FF",
-    borderRadius: 4,
-    marginRight: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.primary.main,
+    borderRadius: BorderRadius.sm,
+    marginRight: 8,
     justifyContent: "center",
     alignItems: "center",
   },
   checkboxChecked: {
-    backgroundColor: "#47B5FF",
+    backgroundColor: Colors.primary.main,
   },
   rememberMeText: {
-    color: "#333",
-    fontSize: 14,
+    color: Colors.neutral.text.secondary,
+    fontSize: Typography.fontSize.sm,
+  },
+  forgot: {
+    color: Colors.primary.main,
+    fontWeight: Typography.fontWeight.semibold,
+    fontSize: Typography.fontSize.sm,
+  },
+  button: {
+    height: 56,
+    borderRadius: BorderRadius.md,
+    justifyContent: "center",
+    alignItems: "center",
+    ...Shadows.md,
+  },
+  buttonText: {
+    color: Colors.neutral.white,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  dividerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 32,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.neutral.border,
+  },
+  or: {
+    marginHorizontal: 16,
+    color: Colors.neutral.text.tertiary,
+    fontSize: 10,
+    fontWeight: Typography.fontWeight.bold,
+    letterSpacing: 1,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+    marginBottom: 32,
+  },
+  socialBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.neutral.white,
+    borderWidth: 1,
+    borderColor: Colors.neutral.border,
+    justifyContent: "center",
+    alignItems: "center",
+    ...Shadows.sm,
+  },
+  footerText: {
+    textAlign: "center",
+    color: Colors.neutral.text.secondary,
+    fontSize: Typography.fontSize.sm,
+  },
+  footerLink: {
+    color: Colors.primary.main,
+    fontWeight: Typography.fontWeight.bold,
   },
 });

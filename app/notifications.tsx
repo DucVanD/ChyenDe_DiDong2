@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
+import * as Haptics from 'expo-haptics';
 
 // Định nghĩa kiểu dữ liệu cho mục thông báo
 type NotificationItemType = {
@@ -45,16 +47,20 @@ export default function NotificationScreen() {
   const router = useRouter();
 
   const renderItem = ({ item }: { item: NotificationItemType }) => (
-    <TouchableOpacity style={styles.itemContainer} onPress={() => {
-        // Xử lý khi bấm vào từng mục (ví dụ: chuyển sang trang Offer)
-        if(item.title === 'Offer') router.push("/(main)/offer"); // Ví dụ đường dẫn
-    }}>
+    <TouchableOpacity
+      style={styles.itemContainer}
+      onPress={() => {
+        Haptics.selectionAsync();
+        if (item.title === 'Offer') router.push("/(main)/offer");
+      }}
+    >
       <View style={styles.itemLeft}>
-        <Ionicons name={item.icon} size={24} color="#40BFFF" style={styles.icon} />
+        <View style={styles.iconContainer}>
+          <Ionicons name={item.icon} size={22} color={Colors.primary.main} />
+        </View>
         <Text style={styles.itemTitle}>{item.title}</Text>
       </View>
-      
-      {/* Badge số lượng thông báo */}
+
       {item.count > 0 && (
         <View style={styles.badgeCircle}>
           <Text style={styles.badgeText}>{item.count}</Text>
@@ -66,13 +72,14 @@ export default function NotificationScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#9098B1" />
+          <Ionicons name="chevron-back" size={24} color={Colors.neutral.text.secondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notification</Text>
+        <Text style={styles.headerTitle}>Thông báo</Text>
+        <View style={{ width: 24 }} />
       </View>
 
       {/* Danh sách thông báo */}
@@ -89,60 +96,67 @@ export default function NotificationScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.neutral.white,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    justifyContent: 'space-between',
+    padding: Spacing.base,
     borderBottomWidth: 1,
-    borderBottomColor: '#EBF0FF',
+    borderBottomColor: Colors.neutral.border,
+    backgroundColor: Colors.neutral.white,
   },
   backButton: {
-    marginRight: 12,
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#223263',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
   },
   listContent: {
-    padding: 0,
+    paddingHorizontal: Spacing.base,
   },
   itemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 0, 
-    // Tạo hiệu ứng hover nhẹ hoặc tách biệt nếu cần
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral.bg,
   },
   itemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  icon: {
-    marginRight: 16,
-    width: 24, // Cố định chiều rộng để text thẳng hàng
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.base,
   },
   itemTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#223263',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.neutral.text.primary,
   },
   badgeCircle: {
-    width: 20,
+    minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FB7181', // Màu đỏ hồng như thiết kế
+    backgroundColor: Colors.accent.error,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
   badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
+    color: Colors.neutral.white,
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
   },
 });

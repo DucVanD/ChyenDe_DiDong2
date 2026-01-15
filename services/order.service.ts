@@ -35,6 +35,7 @@ export interface Order {
     orderDetails: OrderItem[]; // Backend uses 'orderDetails' not 'items'
     createdAt?: string;
     updatedAt?: string;
+    completedAt?: string;
 }
 
 // Helper function to convert string status to number for display
@@ -44,9 +45,10 @@ export const getStatusNumber = (status: string | number): number => {
     const statusMap: { [key: string]: number } = {
         'PENDING': 0,
         'CONFIRMED': 1,
-        'SHIPPING': 2,
-        'COMPLETED': 3,
-        'CANCELLED': 4
+        'PREPARING': 2,
+        'SHIPPING': 3,
+        'COMPLETED': 4,
+        'CANCELLED': 5
     };
 
     return statusMap[status] ?? 0;

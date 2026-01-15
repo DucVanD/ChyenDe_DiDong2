@@ -16,6 +16,21 @@ export interface CartItem {
     stock: number;
 }
 
+// Simple event listener logic for real-time updates
+type CartChangeListener = (count: number) => void;
+const listeners: Set<CartChangeListener> = new Set();
+
+export const subscribeToCartChanges = (listener: CartChangeListener) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+};
+
+const notifyListeners = async () => {
+    const cart = await getLocalCart(); // Use local data to avoid network loop
+    const count = cart.length;
+    listeners.forEach(listener => listener(count));
+};
+
 /**
  * Get the JWT token from AsyncStorage
  */
@@ -104,6 +119,7 @@ export const syncCartAfterLogin = async (): Promise<void> => {
         // Clear local cart after sync
         await AsyncStorage.removeItem(CART_STORAGE_KEY);
         await getCart(); // Refresh from backend
+        notifyListeners(); // Notify after sync complete
     } catch (error) {
         console.error('Error syncing cart after login:', error);
     }
@@ -137,6 +153,7 @@ export const addToCart = async (
                     params: { productId: product.id, quantity }
                 });
                 await getCart(); // Update cache
+                notifyListeners();
                 return { success: true, message: 'Đã thêm vào giỏ hàng' };
             } catch (error) {
                 console.error('Backend add to cart failed:', error);
@@ -165,6 +182,7 @@ export const addToCart = async (
             });
         }
         await saveLocalCart(cart);
+        notifyListeners();
         return { success: true, message: 'Đã thêm vào giỏ hàng' };
     } catch (error) {
         return { success: false, message: 'Có lỗi xảy ra' };
@@ -187,6 +205,7 @@ export const updateQuantity = async (
                     params: { quantity }
                 });
                 await getCart();
+                notifyListeners();
                 return { success: true, message: 'Đã cập nhật' };
             } catch (error) {
                 console.error('Backend update failed:', error);
@@ -199,6 +218,7 @@ export const updateQuantity = async (
             if (quantity > cart[index].stock) return { success: false, message: 'Hết hàng' };
             cart[index].quantity = quantity;
             await saveLocalCart(cart);
+            notifyListeners();
             return { success: true, message: 'Đã cập nhật' };
         }
         return { success: false, message: 'Không tìm thấy' };
@@ -220,6 +240,7 @@ export const removeFromCart = async (
             try {
                 await httpAxios.delete(`/cart/items/${itemId}`);
                 await getCart();
+                notifyListeners();
                 return { success: true, message: 'Đã xóa' };
             } catch (error) {
                 console.error('Backend remove failed:', error);
@@ -229,6 +250,7 @@ export const removeFromCart = async (
         const cart = await getLocalCart();
         const updated = cart.filter(i => !(i.id === itemId && i.selectedSize === selectedSize));
         await saveLocalCart(updated);
+        notifyListeners();
         return { success: true, message: 'Đã xóa' };
     } catch (error) {
         return { success: false, message: 'Có lỗi xảy ra' };
@@ -248,15 +270,54 @@ export const clearCart = async (): Promise<void> => {
         }
     }
     await AsyncStorage.removeItem(CART_STORAGE_KEY);
+    notifyListeners();
+};
+
+/**
+ * Remove only purchased items (for partial cart clearing)
+ */
+export const removePurchasedItems = async (itemKeys: string[]): Promise<void> => {
+    if (!itemKeys || itemKeys.length === 0) return;
+
+    try {
+        const cart = await getCart();
+        const token = await getToken();
+
+        // 1. Identify items to remove matching the keys (id-size)
+        const itemsToRemove = cart.filter(item =>
+            itemKeys.includes(`${item.id}-${item.selectedSize || 'default'}`)
+        );
+
+        if (token) {
+            // Remove from backend one by one
+            for (const item of itemsToRemove) {
+                try {
+                    await httpAxios.delete(`/cart/items/${item.id}`);
+                } catch (e) {
+                    console.error(`Failed to remove item ${item.id} from backend:`, e);
+                }
+            }
+            // Refresh local cache from backend
+            await getCart();
+        } else {
+            // Remove from local storage
+            const updated = cart.filter(item =>
+                !itemKeys.includes(`${item.id}-${item.selectedSize || 'default'}`)
+            );
+            await saveLocalCart(updated);
+        }
+    } catch (error) {
+        console.error('Error removing purchased items:', error);
+    }
 };
 
 export const getCartCount = async (): Promise<number> => {
-    const cart = await getCart();
-    return cart.reduce((sum, item) => sum + item.quantity, 0);
+    const cart = await getLocalCart(); // Use local cache for counts to prevent infinite loop
+    return cart.length;
 };
 
 export const getCartTotal = async (): Promise<number> => {
-    const cart = await getCart();
+    const cart = await getLocalCart(); // Use local cache
     return cart.reduce((sum, item) => sum + (item.discountPrice || item.salePrice || 0) * item.quantity, 0);
 };
 

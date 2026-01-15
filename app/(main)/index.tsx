@@ -1,6 +1,7 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
+import * as Haptics from 'expo-haptics';
 import {
   Dimensions,
   FlatList,
@@ -19,13 +20,14 @@ import {
 } from "react-native";
 
 import ProductCategory from "@/app/components/Home/ProductCategory";
-import ProductFlashSale from "@/app/components/Home/ProductFlashSale";
+import ProductNewArrivals from "@/app/components/Home/ProductNewArrivals";
 import ProductMegaSale from "@/app/components/Home/ProductMegaSale";
 import ProductRecommend from "@/app/components/Home/ProductRecommend";
 import { getCategories, Category } from "@/services/category.service";
-import { getLatestProducts, Product } from "@/services/product.service";
+import { getLatestProducts, getMegaSaleProducts, getBestSellingProducts, Product } from "@/services/product.service";
 import { ActivityIndicator } from "react-native";
 import Skeleton from "@/app/components/common/Skeleton";
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
 
 /* ================= CONSTANT ================= */
 const { width } = Dimensions.get("window");
@@ -37,7 +39,7 @@ interface BannerType {
   id: number;
   title: string;
   subtitle: string;
-  image: string;
+  image: any;
   showTimer: boolean;
 }
 
@@ -45,23 +47,31 @@ interface BannerType {
 export default function Home() {
   const router = useRouter();
 
-  const [activeBanner, setActiveBanner] = useState(0);
+  const [activeMainBanner, setActiveMainBanner] = useState(0);
+  const [activeRecBanner, setActiveRecBanner] = useState(0);
   const [isManualScrolling, setIsManualScrolling] = useState(false);
-  const bannerRef = useRef<FlatList>(null);
+  const mainBannerRef = useRef<FlatList>(null);
+  const recBannerRef = useRef<FlatList>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [latestProducts, setLatestProducts] = useState<Product[]>([]);
+  const [megaSaleProducts, setMegaSaleProducts] = useState<Product[]>([]);
+  const [bestSellingProducts, setBestSellingProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cats, products] = await Promise.all([
+        const [cats, products, mega, best] = await Promise.all([
           getCategories(),
-          getLatestProducts(8)
+          getLatestProducts(10), // Tăng số lượng sản phẩm mới hiển thị
+          getMegaSaleProducts(4),
+          getBestSellingProducts(10)
         ]);
         setCategories(cats);
         setLatestProducts(products);
+        setMegaSaleProducts(mega);
+        setBestSellingProducts(best);
       } catch (error) {
         console.error("Lỗi khi tải dữ liệu trang chủ:", error);
       } finally {
@@ -75,18 +85,54 @@ export default function Home() {
   const bannerData: BannerType[] = [
     {
       id: 1,
-      title: "Siêu Giảm Giá",
-      subtitle: "Giảm tới 50%",
-      image:
-        "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&w=1000",
+      title: "Phong Cách Nam",
+      subtitle: "Casual Collection",
+      image: require("@/assets/images/menswear-polo-shirt-white-casual-apparel-outdoor-shoot.jpg"),
       showTimer: true,
     },
     {
       id: 2,
-      title: "Sưu Tập Mới",
-      subtitle: "Hè 2024",
-      image:
-        "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&w=1000",
+      title: "Phụ Kiện Hot",
+      subtitle: "Trucker Hat Style",
+      image: require("@/assets/images/woman-wearing-pink-trucker-hat-medium-shot.jpg"),
+      showTimer: false,
+    },
+    {
+      id: 3,
+      title: "Váy Hè Năng Động",
+      subtitle: "Trendy Pink Dress",
+      image: require("@/assets/images/portrait-young-beautiful-smiling-girl-trendy-summer-light-pink-dress-sexy-carefree-woman-posing-positive-model-having-fun-dancing.jpg"),
+      showTimer: false,
+    },
+    {
+      id: 4,
+      title: "Fashion Vacation",
+      subtitle: "Summer Blue Dress",
+      image: require("@/assets/images/young-stylish-beautiful-woman-blue-dress-summer-fashion-trend-vacation-garden-tropical-hotel-terrace-smiling.jpg"),
+      showTimer: false,
+    },
+  ];
+
+  const recommendBannerData: BannerType[] = [
+    {
+      id: 1,
+      title: "Quản Lý Kho",
+      subtitle: "Smart Scanning",
+      image: require("@/assets/images/beautiful-smart-asian-young-entrepreneur-business-woman-owner-sme-checking-product-stock-scan-qr-code-working-home.jpg"),
+      showTimer: false,
+    },
+    {
+      id: 2,
+      title: "Ưu Đãi Đặc Biệt",
+      subtitle: "Flash Sale Now",
+      image: require("@/assets/images/front-view-female-builder-holding-red-sale-board-white-wall.jpg"),
+      showTimer: false,
+    },
+    {
+      id: 3,
+      title: "Mua Sắm Thả Ga",
+      subtitle: "Top Trending",
+      image: require("@/assets/images/woman-addicted-shopping.jpg"),
       showTimer: false,
     },
   ];
@@ -96,13 +142,19 @@ export default function Home() {
     if (isManualScrolling) return;
 
     const interval = setInterval(() => {
-      const next = activeBanner + 1 >= bannerData.length ? 0 : activeBanner + 1;
-      bannerRef.current?.scrollToIndex({ index: next, animated: true });
-      setActiveBanner(next);
+      // Main Banner
+      const nextMain = activeMainBanner + 1 >= bannerData.length ? 0 : activeMainBanner + 1;
+      mainBannerRef.current?.scrollToIndex({ index: nextMain, animated: true });
+      setActiveMainBanner(nextMain);
+
+      // Recommend Banner
+      const nextRec = activeRecBanner + 1 >= recommendBannerData.length ? 0 : activeRecBanner + 1;
+      recBannerRef.current?.scrollToIndex({ index: nextRec, animated: true });
+      setActiveRecBanner(nextRec);
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [activeBanner, isManualScrolling]);
+  }, [activeMainBanner, activeRecBanner, isManualScrolling]);
 
   const onMomentumScrollEnd = (
     event: NativeSyntheticEvent<NativeScrollEvent>
@@ -110,7 +162,17 @@ export default function Home() {
     const index = Math.round(
       event.nativeEvent.contentOffset.x / BANNER_WIDTH
     );
-    setActiveBanner(index);
+    setActiveMainBanner(index);
+    setIsManualScrolling(false);
+  };
+
+  const onRecMomentumScrollEnd = (
+    event: NativeSyntheticEvent<NativeScrollEvent>
+  ) => {
+    const index = Math.round(
+      event.nativeEvent.contentOffset.x / BANNER_WIDTH
+    );
+    setActiveRecBanner(index);
     setIsManualScrolling(false);
   };
 
@@ -123,7 +185,11 @@ export default function Home() {
   /* ================= RENDER ================= */
   const renderBannerItem = ({ item }: { item: BannerType }) => (
     <View style={styles.bannerSlide}>
-      <Image source={{ uri: item.image }} style={styles.bannerImage} />
+      <Image
+        source={typeof item.image === 'string' ? { uri: item.image } : item.image}
+        style={styles.bannerImage}
+        resizeMode="cover"
+      />
       <View style={styles.bannerOverlay}>
         <Text style={styles.bannerTitle}>{item.title}</Text>
         <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>
@@ -194,38 +260,59 @@ export default function Home() {
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={20} color="#40BFFF" />
-          {/* ============ CẬP NHẬT PHẦN NÀY ============ */}
+          <Ionicons name="search-outline" size={20} color={Colors.neutral.text.tertiary} />
           <TextInput
             placeholder="Tìm kiếm sản phẩm"
+            placeholderTextColor={Colors.neutral.text.tertiary}
             style={styles.searchInput}
-            returnKeyType="search" // Đổi nút Enter thành Search
+            returnKeyType="search"
             onSubmitEditing={(event) => {
-              // Lấy từ khóa người dùng nhập
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               const query = event.nativeEvent.text;
-              // Chuyển trang và truyền params (tùy chọn)
               router.push({
-                pathname: "/searchProduct",
-                params: { q: query } // Truyền từ khóa qua trang kia để lọc
+                pathname: "/products",
+                params: { q: query }
               });
             }}
           />
-          {/* =========================================== */}
         </View>
 
-        <Ionicons name="heart-outline" size={24} color="#9098B1" />
+        <TouchableOpacity
+          style={[styles.iconButton, styles.aiButton]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/chat");
+          }}
+        >
+          <MaterialCommunityIcons name="robot" size={20} color={Colors.primary.main} />
+        </TouchableOpacity>
 
-        <View style={{ position: "relative" }}>
-          <Ionicons name="notifications-outline" size={24} color="#9098B1" />
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }}
+        >
+          <Ionicons name="heart-outline" size={22} color={Colors.neutral.text.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/notifications');
+          }}
+        >
+          <Ionicons name="notifications-outline" size={22} color={Colors.neutral.text.primary} />
           <View style={styles.badge} />
-        </View>
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* BANNER */}
         <View style={styles.bannerContainer}>
           <FlatList
-            ref={bannerRef}
+            ref={mainBannerRef}
             data={bannerData}
             horizontal
             pagingEnabled
@@ -245,7 +332,7 @@ export default function Home() {
                 key={i}
                 style={[
                   styles.dot,
-                  { backgroundColor: activeBanner === i ? "#40BFFF" : "#EBF0FF" },
+                  { backgroundColor: activeMainBanner === i ? Colors.primary.main : Colors.neutral.border },
                 ]}
               />
             ))}
@@ -256,36 +343,49 @@ export default function Home() {
         <Section title="Danh mục" onPress={() => router.push("/categorys")} />
         <ProductCategory categories={categories.filter(cat => cat.parentId)} />
 
-        {/* FLASH SALE */}
-        <Section title="Giá sốc" onPress={() => router.push("/(main)/offer")} />
-        <ProductFlashSale products={latestProducts.slice(0, 4)} />
+        {/* NEW ARRIVALS */}
+        <Section title="Sản phẩm mới" onPress={() => router.push("/products")} />
+        <ProductNewArrivals products={latestProducts} />
 
         {/* MEGA SALE */}
-        <Section title="Siêu giảm giá" onPress={() => router.push("/(main)/offer")} />
-        <ProductMegaSale products={latestProducts.slice(4, 8)} />
+        <Section title="Siêu giảm giá" onPress={() => router.push("/products")} />
+        <ProductMegaSale products={megaSaleProducts} />
 
-        {/* RECOMMEND */}
-        <Section
-          title="Gợi ý sản phẩm"
-          onPress={() => router.push("/explore")}
-        />
-
-        <View style={styles.recommendBanner}>
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1556906781-9a412961c28c?auto=format&w=800",
-            }}
-            style={styles.recommendImage}
+        <View style={styles.bannerContainer}>
+          <FlatList
+            ref={recBannerRef}
+            data={recommendBannerData}
+            horizontal
+            pagingEnabled
+            keyExtractor={(i) => i.id.toString()}
+            renderItem={renderBannerItem}
+            getItemLayout={getItemLayout}
+            onMomentumScrollEnd={onRecMomentumScrollEnd}
+            onScrollBeginDrag={() => setIsManualScrolling(true)}
+            snapToInterval={BANNER_WIDTH}
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
           />
-          <View style={styles.recommendOverlay}>
-            <Text style={styles.recommendTitle}>Gợi ý sản phẩm</Text>
-            <Text style={styles.recommendSubtitle}>
-              Chúng tôi đề xuất tốt nhất cho bạn
-            </Text>
+
+          <View style={styles.pagination}>
+            {recommendBannerData.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.dot,
+                  { backgroundColor: activeRecBanner === i ? Colors.primary.main : Colors.neutral.border },
+                ]}
+              />
+            ))}
           </View>
         </View>
 
-        <ProductRecommend products={latestProducts} />
+        <Section
+          title="Gợi ý sản phẩm"
+          onPress={() => router.push("/products")}
+        />
+
+        <ProductRecommend products={bestSellingProducts} />
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
@@ -302,73 +402,113 @@ const Section = ({
 }) => (
   <View style={styles.sectionHeader}>
     <Text style={styles.sectionTitle}>{title}</Text>
-    <TouchableOpacity onPress={onPress}>
-      <Text style={styles.seeMore}>See More</Text>
+    <TouchableOpacity
+      onPress={() => {
+        Haptics.selectionAsync();
+        onPress();
+      }}
+    >
+      <Text style={styles.seeMore}>Xem thêm</Text>
     </TouchableOpacity>
   </View>
 );
+
 
 /* ================= STYLE ================= */
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.neutral.white,
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight : 0,
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    gap: 16,
+    paddingHorizontal: Spacing.base,
+    minHeight: 68,
+    gap: Spacing.md,
+    backgroundColor: Colors.neutral.white,
     borderBottomWidth: 1,
-    borderBottomColor: "#EBF0FF",
+    borderBottomColor: Colors.neutral.border,
   },
 
   searchBox: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EBF0FF",
-    borderRadius: 5,
-    paddingHorizontal: 12,
-    height: 46,
+    backgroundColor: Colors.neutral.bg,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    height: 44,
+    gap: Spacing.sm,
   },
 
-  searchInput: { flex: 1, marginLeft: 6 },
+  searchInput: {
+    flex: 1,
+    fontSize: Typography.fontSize.base,
+    color: Colors.neutral.text.primary,
+  },
+
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.neutral.bg,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  aiButton: {
+    backgroundColor: Colors.primary.light,
+    borderWidth: 1,
+    borderColor: Colors.primary.main,
+  },
 
   badge: {
     position: "absolute",
-    top: -2,
-    right: -2,
+    top: 8,
+    right: 8,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#FB7181",
+    backgroundColor: Colors.accent.error,
   },
 
   bannerContainer: {
-    margin: 16,
+    margin: Spacing.base,
     height: 206,
   },
 
   bannerSlide: {
     width: BANNER_WIDTH,
     height: 206,
-    borderRadius: 8,
+    borderRadius: BorderRadius.lg,
     overflow: "hidden",
   },
 
   bannerImage: { width: "100%", height: "100%" },
   bannerOverlay: { position: "absolute", top: 32, left: 24 },
-  bannerTitle: { fontSize: 24, fontWeight: "700", color: "#fff" },
-  bannerSubtitle: { fontSize: 24, fontWeight: "700", color: "#fff", marginBottom: 12 },
+  bannerTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.white,
+  },
+  bannerSubtitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.white,
+    marginBottom: Spacing.md,
+  },
 
   timerContainer: { flexDirection: "row", alignItems: "center" },
-  timerBox: { backgroundColor: "#fff", padding: 8, borderRadius: 5 },
-  timerText: { fontWeight: "700" },
-  timerColon: { color: "#fff", marginHorizontal: 4 },
+  timerBox: {
+    backgroundColor: Colors.neutral.white,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  timerText: { fontWeight: Typography.fontWeight.bold },
+  timerColon: { color: Colors.neutral.white, marginHorizontal: 4 },
 
   pagination: {
     position: "absolute",
@@ -384,22 +524,36 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    marginTop: 20,
+    alignItems: "center",
+    paddingHorizontal: Spacing.base,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
   },
 
-  sectionTitle: { fontSize: 16, fontWeight: "700" },
-  seeMore: { color: "#40BFFF", fontWeight: "700" },
+  sectionTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
+  },
+  seeMore: {
+    color: Colors.primary.main,
+    fontWeight: Typography.fontWeight.semibold,
+    fontSize: Typography.fontSize.sm,
+  },
 
   recommendBanner: {
-    margin: 16,
+    margin: Spacing.base,
     height: 200,
-    borderRadius: 8,
+    borderRadius: BorderRadius.lg,
     overflow: "hidden",
   },
 
   recommendImage: { width: "100%", height: "100%" },
   recommendOverlay: { position: "absolute", top: 30, left: 24 },
-  recommendTitle: { color: "#fff", fontSize: 22, fontWeight: "700" },
-  recommendSubtitle: { color: "#fff", marginTop: 6 },
+  recommendTitle: {
+    color: Colors.neutral.white,
+    fontSize: Typography.fontSize["2xl"],
+    fontWeight: Typography.fontWeight.bold,
+  },
+  recommendSubtitle: { color: Colors.neutral.white, marginTop: 6 },
 });

@@ -14,6 +14,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { getStoredUser, logout, UserInfo } from '../services/auth.service';
+import { Colors, Spacing, BorderRadius, Typography, Shadows } from "@/constants/theme";
+import { Button } from "@/app/components/common/Button";
+import * as Haptics from 'expo-haptics';
 
 // 1. Define the type for your menu items
 type MenuItemType = {
@@ -96,6 +99,13 @@ export default function Profile() {
       value: user?.address || 'Chưa cập nhật',
       type: 'text',
     },
+    {
+      id: 'change_password',
+      icon: 'lock-closed-outline',
+      label: 'Đổi mật khẩu',
+      value: '',
+      type: 'navigation',
+    },
   ];
 
   const renderMenuItem = (item: MenuItemType) => {
@@ -104,17 +114,20 @@ export default function Profile() {
         key={item.id}
         style={styles.menuItem}
         onPress={() => {
-          console.log(`Pressed ${item.label}`);
+          Haptics.selectionAsync();
+          if (item.id === 'change_password') {
+            router.push('/change-password');
+          }
         }}
       >
         <View style={styles.menuItemLeft}>
-          <Ionicons name={item.icon} size={24} color="#40BFFF" style={styles.menuIcon} />
+          <Ionicons name={item.icon} size={22} color={Colors.primary.main} style={styles.menuIcon} />
           <Text style={styles.menuLabel}>{item.label}</Text>
         </View>
 
         <View style={styles.menuItemRight}>
           <Text style={styles.menuValue} numberOfLines={1}>{item.value}</Text>
-          <Ionicons name="chevron-forward" size={24} color="#9098B1" />
+          <Ionicons name="chevron-forward" size={18} color={Colors.neutral.text.tertiary} />
         </View>
       </TouchableOpacity>
     );
@@ -123,8 +136,14 @@ export default function Profile() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#9098B1" />
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.selectionAsync();
+            router.back();
+          }}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={24} color={Colors.neutral.text.secondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Hồ sơ cá nhân</Text>
         <View style={{ width: 24 }} />
@@ -143,27 +162,35 @@ export default function Profile() {
         </View>
 
         {/* Edit Profile Button */}
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => router.push('/editProfile')}
-        >
-          <Ionicons name="create-outline" size={20} color="#40BFFF" />
-          <Text style={styles.editButtonText}>Chỉnh sửa hồ sơ</Text>
-        </TouchableOpacity>
+        <View style={{ marginBottom: Spacing.xl }}>
+          <Button
+            title="Chỉnh sửa hồ sơ"
+            variant="primary"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/editProfile');
+            }}
+            icon="create-outline"
+            fullWidth
+          />
+        </View>
 
         <View style={styles.menuContainer}>
           {menuItems.map((item) => renderMenuItem(item))}
 
-          <TouchableOpacity
-            style={[styles.menuItem, { marginTop: 20 }]}
-            onPress={handleLogout}
-          >
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="log-out-outline" size={24} color="#FB7181" style={styles.menuIcon} />
-              <Text style={[styles.menuLabel, { color: '#FB7181' }]}>Đăng xuất</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#9098B1" />
-          </TouchableOpacity>
+          <View style={{ marginTop: Spacing["2xl"] }}>
+            <Button
+              title="Đăng xuất"
+              variant="outline"
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                handleLogout();
+              }}
+              icon="log-out-outline"
+              textColor={Colors.accent.error}
+              fullWidth
+            />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -173,103 +200,94 @@ export default function Profile() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.neutral.white,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: Spacing.base,
     borderBottomWidth: 1,
-    borderBottomColor: '#EBF0FF',
-    backgroundColor: '#FFF',
+    borderBottomColor: Colors.neutral.border,
+    backgroundColor: Colors.neutral.white,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#223263',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
   },
   backButton: {
     padding: 4,
   },
   contentContainer: {
-    padding: 16,
+    padding: Spacing.base,
   },
   userInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 16,
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.neutral.white,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    ...Shadows.sm,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    marginRight: 16,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginRight: Spacing.lg,
+    backgroundColor: Colors.neutral.bg,
   },
   userInfoText: {
     justifyContent: 'center',
+    flex: 1,
   },
   userName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#223263',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
     marginBottom: 4,
   },
   userHandle: {
-    fontSize: 12,
-    color: '#9098B1',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
   },
   menuContainer: {
-
+    marginTop: Spacing.sm,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral.bg,
   },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   menuIcon: {
-    marginRight: 16,
+    marginRight: Spacing.base,
     width: 24,
   },
   menuLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#223263',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.neutral.text.primary,
   },
   menuItemRight: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     justifyContent: 'flex-end',
-    paddingLeft: 10,
   },
   menuValue: {
-    fontSize: 12,
-    color: '#9098B1',
-    marginRight: 10,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.neutral.text.secondary,
+    marginRight: 8,
     textAlign: 'right',
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EBF0FF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginBottom: 24,
-    gap: 8,
-  },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#40BFFF',
   },
 });

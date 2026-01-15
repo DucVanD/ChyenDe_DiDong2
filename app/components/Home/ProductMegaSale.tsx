@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router"; // <--- 1. Import
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   FlatList,
@@ -9,46 +9,53 @@ import {
   View,
 } from "react-native";
 import FadeInStagger from "../common/FadeInStagger";
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from "@/constants/theme";
+import DiscountBadge from "../common/DiscountBadge";
 
-import { Product } from "@/services/product.service";
+import { getLatestProducts, getMegaSaleProducts, getBestSellingProducts, Product } from "@/services/product.service";
+import * as Haptics from 'expo-haptics';
 
 interface Props {
   products: Product[];
 }
 
 export default function ProductMegaSale({ products }: Props) {
-  const router = useRouter(); // <--- 2. Khởi tạo
+  const router = useRouter();
 
-  // <--- 3. Di chuyển vào trong Component
   const renderHorizontalProduct = ({ item, index }: { item: Product, index: number }) => (
     <FadeInStagger index={index}>
       <TouchableOpacity
         style={styles.card}
-        onPress={() =>
+        onPress={() => {
+          Haptics.selectionAsync();
           router.push({
             pathname: "/detail",
             params: { id: item.id }
-          })
-        }
+          });
+        }}
       >
-        <Image source={{ uri: item.image }} style={styles.image} />
-        <Text style={styles.name} numberOfLines={2}>
-          {item.name}
-        </Text>
-        <Text style={styles.price}>
-          {item.discountPrice
-            ? (item.discountPrice || 0).toLocaleString('vi-VN')
-            : (item.salePrice || 0).toLocaleString('vi-VN')}đ
-        </Text>
-        <View style={styles.row}>
+        <View style={styles.imageWrapper}>
+          <Image source={{ uri: item.image }} style={styles.image} />
           {item.discountPrice && (
-            <>
-              <Text style={styles.oldPrice}>{(item.salePrice || 0).toLocaleString('vi-VN')}đ</Text>
-              <Text style={styles.discount}>
-                {Math.round((1 - item.discountPrice / item.salePrice) * 100)}% Off
-              </Text>
-            </>
+            <DiscountBadge
+              discount={(1 - item.discountPrice / item.salePrice) * 100}
+            />
           )}
+        </View>
+        <View style={styles.content}>
+          <Text style={styles.name} numberOfLines={2}>
+            {item.name}
+          </Text>
+          <Text style={styles.price}>
+            {item.discountPrice
+              ? (item.discountPrice || 0).toLocaleString('vi-VN')
+              : (item.salePrice || 0).toLocaleString('vi-VN')}đ
+          </Text>
+          <View style={styles.priceRow}>
+            {item.discountPrice && (
+              <Text style={styles.oldPrice}>{(item.salePrice || 0).toLocaleString('vi-VN')}đ</Text>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
     </FadeInStagger>
@@ -60,7 +67,7 @@ export default function ProductMegaSale({ products }: Props) {
         data={products}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingLeft: 16 }}
+        contentContainerStyle={{ paddingLeft: Spacing.base }}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderHorizontalProduct}
       />
@@ -69,60 +76,80 @@ export default function ProductMegaSale({ products }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // ... (Giữ nguyên styles cũ của bạn)
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 12,
+    paddingHorizontal: Spacing.base,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
   },
   seeMoreText: {
-    fontSize: 14,
-    color: "#40BFFF",
+    fontSize: Typography.fontSize.sm,
+    color: Colors.primary.main,
   },
   card: {
-    width: 140,
-    marginRight: 16,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    padding: 10,
-    elevation: 2,
+    width: 150,
+    marginRight: Spacing.base,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.neutral.white,
+    ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.neutral.border,
+    overflow: 'hidden',
+  },
+  imageWrapper: {
+    width: "100%",
+    height: 130,
+    backgroundColor: Colors.neutral.bg,
+    position: 'relative',
   },
   image: {
     width: "100%",
-    height: 120,
+    height: "100%",
     resizeMode: "contain",
-    marginBottom: 8,
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: Colors.accent.error,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderBottomRightRadius: BorderRadius.md,
+  },
+  discountText: {
+    fontSize: 10,
+    color: Colors.neutral.white,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  content: {
+    padding: Spacing.sm,
   },
   name: {
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.neutral.text.primary,
     marginBottom: 4,
+    height: 36,
   },
   price: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#40BFFF",
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary.main,
   },
-  row: {
+  priceRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 2,
+    height: 16, // Reserve space for old price to prevent bập bênh
   },
   oldPrice: {
-    fontSize: 12,
-    color: "#9098B1",
+    fontSize: 10,
+    color: Colors.neutral.text.tertiary,
     textDecorationLine: "line-through",
-    marginRight: 6,
-  },
-  discount: {
-    fontSize: 12,
-    color: "#FB7181",
-    fontWeight: "bold",
   },
 });

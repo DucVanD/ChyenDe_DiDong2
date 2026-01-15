@@ -13,10 +13,16 @@ import {
     TouchableOpacity,
     View,
     ActivityIndicator,
-    Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import httpAxios from '../services/httpAxios';
 import { getStoredUser, UserInfo } from '../services/auth.service';
 import { updateUserProfile } from '../services/user.service';
+import { API_BASE_URL, STORAGE_KEYS } from '../config/api.config';
+import { Colors, Spacing, BorderRadius, Typography, Shadows } from "@/constants/theme";
+import { showToast } from './components/common/Toast';
+import * as Haptics from 'expo-haptics';
 
 export default function EditProfile() {
     const router = useRouter();
@@ -30,6 +36,7 @@ export default function EditProfile() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
     // Load user data
     useEffect(() => {
@@ -55,19 +62,103 @@ export default function EditProfile() {
         loadUser();
     }, []);
 
+    // Pick image from gallery
+    const pickImage = async () => {
+        try {
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permissionResult.granted) {
+                showToast({ message: 'Cần cấp quyền truy cập thư viện ảnh', type: 'error' });
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images' as any,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+
+                // Validate file size (max 5MB)
+                if (result.assets[0].fileSize && result.assets[0].fileSize > 5 * 1024 * 1024) {
+                    showToast({ message: 'Kích thước ảnh không được vượt quá 5MB', type: 'warning' });
+                    return;
+                }
+
+                setAvatar(imageUri);
+                await uploadAvatar(imageUri);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            showToast({ message: 'Không thể chọn ảnh', type: 'error' });
+        }
+    };
+
+    // Upload avatar to server
+    const uploadAvatar = async (imageUri: string) => {
+        if (!user) return;
+
+        setUploadingAvatar(true);
+        try {
+            const formData = new FormData();
+            const filename = imageUri.split('/').pop() || 'avatar.jpg';
+            const match = /\.(\w+)$/.exec(filename);
+            const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+            // Web platform: handle both blob: and data: URIs
+            if (Platform.OS === 'web') {
+                const response = await fetch(imageUri);
+                const blob = await response.blob();
+                const file = new File([blob], filename, { type: blob.type || type });
+                formData.append('file', file);
+            } else {
+                // Mobile platform: use uri directly
+                formData.append('file', {
+                    uri: imageUri,
+                    name: filename,
+                    type,
+                } as any);
+            }
+
+            const config = Platform.OS === 'web'
+                ? {}
+                : { headers: { 'Content-Type': 'multipart/form-data' } };
+
+            const response = await httpAxios.post('/upload/user', formData, config);
+
+            if (response.data && response.data.url) {
+                setAvatar(response.data.url);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                showToast({ message: 'Cập nhật ảnh đại diện thành công', type: 'success' });
+            }
+        } catch (error: any) {
+            console.error('Error uploading avatar:', error);
+            showToast({ message: 'Không thể tải ảnh lên. Vui lòng thử lại', type: 'error' });
+        } finally {
+            setUploadingAvatar(false);
+        }
+    };
+
     // Validate form
     const validateForm = (): boolean => {
         if (!name.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập họ tên');
+            showToast({ message: 'Vui lòng nhập họ tên', type: 'warning' });
+            return false;
+        }
+        const nameRegex = /^[a-zA-ZÀ-ỹ\s]+$/;
+        if (!nameRegex.test(name.trim())) {
+            showToast({ message: 'Họ tên chỉ được chứa chữ cái và khoảng trắng', type: 'warning' });
             return false;
         }
         if (!phone.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
+            showToast({ message: 'Vui lòng nhập số điện thoại', type: 'warning' });
             return false;
         }
-        const phoneRegex = /^[0-9]{10,11}$/;
+        const phoneRegex = /^[0-9]{10}$/;
         if (!phoneRegex.test(phone.trim())) {
-            Alert.alert('Lỗi', 'Số điện thoại không hợp lệ (10-11 số)');
+            showToast({ message: 'Số điện thoại không hợp lệ (10 số)', type: 'warning' });
             return false;
         }
         return true;
@@ -80,24 +171,20 @@ export default function EditProfile() {
 
         setSaving(true);
         try {
-            // Update profile
             await updateUserProfile(user.id, {
                 name: name.trim(),
                 email: email.trim(),
                 phone: phone.trim(),
                 address: address.trim(),
-                avatar: avatar, // Keep existing avatar
+                avatar: avatar,
             });
 
-            Alert.alert('Thành công', 'Cập nhật hồ sơ thành công!', [
-                {
-                    text: 'OK',
-                    onPress: () => router.back(),
-                },
-            ]);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            showToast({ message: 'Cập nhật hồ sơ thành công!', type: 'success' });
+            setTimeout(() => router.back(), 1500);
         } catch (error: any) {
             console.error('Error updating profile:', error);
-            Alert.alert('Lỗi', error.message || 'Không thể cập nhật hồ sơ');
+            showToast({ message: error.message || 'Không thể cập nhật hồ sơ', type: 'error' });
         } finally {
             setSaving(false);
         }
@@ -107,7 +194,7 @@ export default function EditProfile() {
         return (
             <SafeAreaView style={styles.safeArea}>
                 <View style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
-                    <ActivityIndicator size="large" color="#40BFFF" />
+                    <ActivityIndicator size="large" color={Colors.primary.main} />
                 </View>
             </SafeAreaView>
         );
@@ -118,7 +205,7 @@ export default function EditProfile() {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color="#9098B1" />
+                    <Ionicons name="chevron-back" size={24} color={Colors.neutral.text.secondary} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Chỉnh sửa hồ sơ</Text>
                 <TouchableOpacity
@@ -127,7 +214,7 @@ export default function EditProfile() {
                     style={styles.saveButton}
                 >
                     {saving ? (
-                        <ActivityIndicator size="small" color="#40BFFF" />
+                        <ActivityIndicator size="small" color={Colors.primary.main} />
                     ) : (
                         <Text style={styles.saveButtonText}>Lưu</Text>
                     )}
@@ -135,7 +222,7 @@ export default function EditProfile() {
             </View>
 
             <ScrollView contentContainerStyle={styles.contentContainer}>
-                {/* Avatar Section - Display only, no change */}
+                {/* Avatar Section */}
                 <View style={styles.avatarSection}>
                     <View style={styles.avatarContainer}>
                         <Image
@@ -146,8 +233,19 @@ export default function EditProfile() {
                             }
                             style={styles.avatar}
                         />
+                        <TouchableOpacity
+                            style={styles.cameraButton}
+                            onPress={pickImage}
+                            disabled={uploadingAvatar}
+                        >
+                            {uploadingAvatar ? (
+                                <ActivityIndicator size="small" color={Colors.neutral.white} />
+                            ) : (
+                                <Ionicons name="camera" size={20} color={Colors.neutral.white} />
+                            )}
+                        </TouchableOpacity>
                     </View>
-                    <Text style={styles.avatarHint}>Upload ảnh sẽ có trong phiên bản sau</Text>
+                    <Text style={styles.avatarHint}>Nhấn vào camera để thay đổi ảnh</Text>
                 </View>
 
                 {/* Form Fields */}
@@ -156,13 +254,13 @@ export default function EditProfile() {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Họ tên *</Text>
                         <View style={styles.inputWrapper}>
-                            <Ionicons name="person-outline" size={20} color="#9098B1" style={styles.inputIcon} />
+                            <Ionicons name="person-outline" size={20} color={Colors.neutral.text.tertiary} style={styles.inputIcon} />
                             <TextInput
                                 style={styles.input}
                                 value={name}
                                 onChangeText={setName}
                                 placeholder="Nhập họ tên"
-                                placeholderTextColor="#9098B1"
+                                placeholderTextColor={Colors.neutral.text.tertiary}
                             />
                         </View>
                     </View>
@@ -170,14 +268,14 @@ export default function EditProfile() {
                     {/* Email (Read-only) */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Email</Text>
-                        <View style={[styles.inputWrapper, styles.inputDisabled]}>
-                            <Ionicons name="mail-outline" size={20} color="#9098B1" style={styles.inputIcon} />
+                        <View style={[styles.inputWrapper, styles.inputDisabledWrapper]}>
+                            <Ionicons name="mail-outline" size={20} color={Colors.neutral.text.tertiary} style={styles.inputIcon} />
                             <TextInput
                                 style={[styles.input, styles.inputDisabled]}
                                 value={email}
                                 editable={false}
                                 placeholder="Email"
-                                placeholderTextColor="#9098B1"
+                                placeholderTextColor={Colors.neutral.text.tertiary}
                             />
                         </View>
                         <Text style={styles.helperText}>Email không thể thay đổi</Text>
@@ -187,15 +285,15 @@ export default function EditProfile() {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Số điện thoại *</Text>
                         <View style={styles.inputWrapper}>
-                            <Ionicons name="call-outline" size={20} color="#9098B1" style={styles.inputIcon} />
+                            <Ionicons name="call-outline" size={20} color={Colors.neutral.text.tertiary} style={styles.inputIcon} />
                             <TextInput
                                 style={styles.input}
                                 value={phone}
                                 onChangeText={setPhone}
                                 placeholder="Nhập số điện thoại"
-                                placeholderTextColor="#9098B1"
+                                placeholderTextColor={Colors.neutral.text.tertiary}
                                 keyboardType="phone-pad"
-                                maxLength={11}
+                                maxLength={10}
                             />
                         </View>
                     </View>
@@ -204,13 +302,13 @@ export default function EditProfile() {
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Địa chỉ</Text>
                         <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
-                            <Ionicons name="location-outline" size={20} color="#9098B1" style={styles.inputIcon} />
+                            <Ionicons name="location-outline" size={20} color={Colors.neutral.text.tertiary} style={styles.inputIcon} />
                             <TextInput
                                 style={[styles.input, styles.textArea]}
                                 value={address}
                                 onChangeText={setAddress}
                                 placeholder="Nhập địa chỉ"
-                                placeholderTextColor="#9098B1"
+                                placeholderTextColor={Colors.neutral.text.tertiary}
                                 multiline
                                 numberOfLines={3}
                                 textAlignVertical="top"
@@ -226,83 +324,97 @@ export default function EditProfile() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: Colors.neutral.white,
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 16,
+        padding: Spacing.base,
         borderBottomWidth: 1,
-        borderBottomColor: '#EBF0FF',
-        backgroundColor: '#FFF',
+        borderBottomColor: Colors.neutral.border,
+        backgroundColor: Colors.neutral.white,
     },
     headerTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#223263',
+        fontSize: Typography.fontSize.lg,
+        fontWeight: Typography.fontWeight.bold,
+        color: Colors.neutral.text.primary,
     },
     backButton: {
         padding: 4,
     },
     saveButton: {
         paddingVertical: 4,
-        paddingHorizontal: 12,
+        paddingHorizontal: Spacing.sm,
     },
     saveButtonText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#40BFFF',
+        fontSize: Typography.fontSize.base,
+        fontWeight: Typography.fontWeight.bold,
+        color: Colors.primary.main,
     },
     contentContainer: {
-        padding: 16,
+        padding: Spacing.base,
     },
 
     // Avatar Section
     avatarSection: {
         alignItems: 'center',
-        marginBottom: 32,
-        marginTop: 16,
+        marginBottom: Spacing.xl,
+        marginTop: Spacing.md,
     },
     avatarContainer: {
         position: 'relative',
+    },
+    cameraButton: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: Colors.primary.main,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: Colors.neutral.white,
+        ...Shadows.md,
     },
     avatar: {
         width: 100,
         height: 100,
         borderRadius: 50,
         borderWidth: 3,
-        borderColor: '#40BFFF',
+        borderColor: Colors.neutral.bg,
     },
     avatarHint: {
         marginTop: 12,
-        fontSize: 12,
-        color: '#9098B1',
+        fontSize: Typography.fontSize.xs,
+        color: Colors.neutral.text.tertiary,
         fontStyle: 'italic',
     },
 
     // Form
     formContainer: {
-        gap: 20,
+        gap: Spacing.lg,
     },
     inputGroup: {
-        marginBottom: 20,
+        marginBottom: 4,
     },
     label: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#223263',
+        fontSize: Typography.fontSize.sm,
+        fontWeight: Typography.fontWeight.semibold,
+        color: Colors.neutral.text.primary,
         marginBottom: 8,
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#EBF0FF',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        backgroundColor: '#FAFAFA',
+        borderColor: Colors.neutral.border,
+        borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.md,
+        backgroundColor: Colors.neutral.bg,
     },
     inputIcon: {
         marginRight: 12,
@@ -310,24 +422,27 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         paddingVertical: 12,
-        fontSize: 14,
-        color: '#223263',
+        fontSize: Typography.fontSize.base,
+        color: Colors.neutral.text.primary,
+    },
+    inputDisabledWrapper: {
+        backgroundColor: '#F3F4F6',
+        borderColor: 'transparent',
     },
     inputDisabled: {
-        backgroundColor: '#F5F5F5',
-        color: '#9098B1',
+        color: Colors.neutral.text.tertiary,
     },
     textAreaWrapper: {
         alignItems: 'flex-start',
         paddingTop: 12,
     },
     textArea: {
-        minHeight: 80,
+        minHeight: 100,
         paddingTop: 0,
     },
     helperText: {
-        fontSize: 11,
-        color: '#9098B1',
+        fontSize: Typography.fontSize.xs,
+        color: Colors.neutral.text.tertiary,
         marginTop: 4,
         fontStyle: 'italic',
     },
